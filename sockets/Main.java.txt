@@ -1,0 +1,73 @@
+package com.yourname.p2pchat;
+
+import com.yourname.p2pchat.core.ChatSessionManager;
+import com.yourname.p2pchat.network.ConnectionManager;
+import com.yourname.p2pchat.ui.ConsoleUI;
+
+import java.io.IOException;
+import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        System.out.print("Enter your username: ");
+        String myId = scanner.nextLine().trim();
+        
+        System.out.print("Enter port to listen on (e.g., 8080): ");
+        int listenPort = Integer.parseInt(scanner.nextLine().trim());
+
+        // 1. Initialize Thread Pool
+        // A CachedThreadPool creates new threads as needed and reuses idle ones.
+        // It's perfect for handling an arbitrary number of P2P socket connections.
+        ExecutorService threadPool = Executors.newCachedThreadPool();
+
+        // 2. Initialize Components
+        ConsoleUI ui = new ConsoleUI();
+        ChatSessionManager sessionManager = new ChatSessionManager(myId, ui, threadPool);
+        
+        // Break circular dependency by using a setter
+        ui.setSessionManager(sessionManager); 
+
+        ConnectionManager connectionManager;
+        try {
+            // 3. Start the Server Listener
+            connectionManager = new ConnectionManager(listenPort, sessionManager::acceptIncomingConnection);
+            threadPool.submit(connectionManager);
+        } catch (IOException e) {
+            System.err.println("Fatal: Could not bind to port " + listenPort + ". Is it already in use?");
+            threadPool.shutdownNow();
+            return;
+        }
+
+        // 4. Start the UI (This method blocks indefinitely until the user types /exit)
+        ui.start();
+
+        // 5. Graceful Shutdown Routine (Executes only after ui.start() finishes)
+        System.out.println("Executing graceful shutdown...");
+        
+        // Notify all peers we are leaving and close all sockets
+        sessionManager.shutdownAll();
+        
+        // Unblock the accept() loop
+        connectionManager.shutdown(); 
+        
+        // Tell the thread pool to stop accepting new tasks and let running tasks finish
+        threadPool.shutdown(); 
+        try {
+            // Wait up to 3 seconds for threads to terminate gracefully
+            if (!threadPool.awaitTermination(3, TimeUnit.SECONDS)) {
+                // If they don't finish, force kill them
+                threadPool.shutdownNow(); 
+            }
+        } catch (InterruptedException e) {
+            threadPool.shutdownNow();
+        }
+        
+        System.out.println("Application terminated.");
+        System.exit(0);
+    }
+}

@@ -1,0 +1,108 @@
+package com.yourname.p2pchat.ui;
+
+import com.yourname.p2pchat.core.ChatSessionManager;
+import com.yourname.p2pchat.domain.Message;
+
+import java.util.Scanner;
+
+public class ConsoleUI implements ChatUI {
+    private ChatSessionManager sessionManager;
+    private final Scanner scanner;
+    private boolean isRunning;
+
+    public ConsoleUI() {
+        this.scanner = new Scanner(System.in);
+        this.isRunning = true;
+    }
+
+    // Dependency Injection: The UI needs the Session Manager to execute commands.
+    public void setSessionManager(ChatSessionManager sessionManager) {
+        this.sessionManager = sessionManager;
+    }
+
+    @Override
+    public void start() {
+        System.out.println("=========================================");
+        System.out.println("          P2P Chat Initialized           ");
+        System.out.println("=========================================");
+        System.out.println("Commands:");
+        System.out.println("  /connect <ip> <port>   - Connect to a peer");
+        System.out.println("  @<peerId> <message>    - Send a message");
+        System.out.println("  /exit                  - Close all connections and exit");
+        System.out.println("=========================================");
+
+        while (isRunning) {
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) continue;
+
+            processCommand(input);
+        }
+    }
+
+    private void processCommand(String input) {
+        try {
+            if (input.startsWith("/connect ")) {
+                String[] parts = input.split(" ");
+                if (parts.length != 3) {
+                    displayError("Usage: /connect <ip> <port>");
+                    return;
+                }
+                String ip = parts[1];
+                int port = Integer.parseInt(parts[2]);
+                sessionManager.connectToPeer(ip, port);
+
+            } else if (input.startsWith("@")) {
+                // Format: @Username Hello there!
+                int spaceIndex = input.indexOf(" ");
+                if (spaceIndex == -1) {
+                    displayError("Usage: @<peerId> <message>");
+                    return;
+                }
+                String peerId = input.substring(1, spaceIndex);
+                String message = input.substring(spaceIndex + 1);
+                sessionManager.sendChatMessage(peerId, message);
+                
+                // Echo what we just sent to our own console
+                System.out.println("[You -> " + peerId + "]: " + message);
+
+            } else if (input.equalsIgnoreCase("/exit")) {
+                System.out.println("Exiting application...");
+                isRunning = false;
+                // We rely on Main.java to catch the exit of start() and tear down the pools.
+                
+            } else {
+                displayError("Unknown command.");
+            }
+        } catch (NumberFormatException e) {
+            displayError("Invalid port number.");
+        } catch (Exception e) {
+            displayError("Error processing command: " + e.getMessage());
+        }
+    }
+
+    // --- IncomingMessageListener Implementation ---
+
+    @Override
+    public void onMessageReceived(Message message) {
+        // We use ANSI escape codes (optional but nice) to color incoming text so it stands out
+        System.out.println("\n\u001B[34m[" + message.getTimestamp() + "] " 
+                + message.getSenderId() + ": " + message.getPayload() + "\u001B[0m");
+    }
+
+    @Override
+    public void onPeerDisconnected(String peerId, String reason) {
+        displaySystemMessage(peerId + " disconnected (" + reason + ").");
+    }
+
+    // --- ChatUI Implementation ---
+
+    @Override
+    public void displaySystemMessage(String message) {
+        System.out.println("\n[System] " + message);
+    }
+
+    @Override
+    public void displayError(String error) {
+        System.err.println("\n[Error] " + error);
+    }
+}

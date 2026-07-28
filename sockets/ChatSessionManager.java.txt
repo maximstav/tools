@@ -1,0 +1,182 @@
+package com.yourname.p2pchat.core;
+
+import com.yourname.p2pchat.domain.Message;
+import com.yourname.p2pchat.domain.MessageType;
+import com.yourname.p2pchat.network.PeerConnection;
+import com.yourname.p2pchat.ui.ChatUI;
+
+import java.io.IOException;
+import java.net.Socket;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+
+public class ChatSessionManager {
+    private final String myId;
+    private final ChatUI ui;
+    private final ExecutorService threadPool;
+
+    // Connections currently undergoing the INIT/ACK handshake
+    private final Map<String, PeerConnection> pendingConnections = new ConcurrentHashMap<>();
+    
+    // Fully established connections mapped by the peer's username/ID
+    private final Map<String, PeerConnection> activeChats = new ConcurrentHashMap<>();
+
+    public ChatSessionManager(String myId, ChatUI ui, ExecutorService threadPool) {
+        this.myId = myId;
+        this.ui = ui;
+        this.threadPool = threadPool;
+    }
+
+    /**
+     * Called by the ConnectionManager when a new peer connects to our listening port.
+     */
+    public void acceptIncomingConnection(Socket socket) {
+        String tempId = "incoming-" + UUID.randomUUID().toString();
+        try {
+            // We expect the first message to be an INIT. We set a 5-second timeout to prevent 
+            // someone from connecting and keeping our socket hostage indefinitely.
+            socket.setSoTimeout(5000); 
+            
+            PeerConnection connection = createConnection(socket, tempId);
+            pendingConnections.put(tempId, connection);
+        } catch (IOException e) {
+            System.err.println("[Error] Failed to accept socket: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Called by the UI when the user wants to connect to a specific IP/Port.
+     */
+    public void connectToPeer(String ip, int port) {
+        threadPool.submit(() -> {
+            try {
+                Socket socket = new Socket(ip, port);
+                socket.setSoTimeout(5000); // 5-second handshake timeout
+                
+                String tempId = "outgoing-" + UUID.randomUUID().toString();
+                PeerConnection connection = createConnection(socket, tempId);
+                pendingConnections.put(tempId, connection);
+
+                // We are the initiator, so we send the INIT message first
+                connection.sendMessage(new Message(MessageType.INIT, myId, "Requesting connection"));
+                
+            } catch (IOException e) {
+                ui.displayError("Could not connect to " + ip + ":" + port);
+            }
+        });
+    }
+
+    /**
+     * Creates the PeerConnection and routes its listener callbacks back to this manager.
+     */
+    private PeerConnection createConnection(Socket socket, String connectionId) throws IOException {
+        return new PeerConnection(
+            socket, 
+            connectionId, 
+            new IncomingMessageListener() {
+                @Override
+                public void onMessageReceived(Message message) {
+                    routeIncomingMessage(connectionId, message);
+                }
+
+                @Override
+                public void onPeerDisconnected(String peerId, String reason) {
+                    handleDisconnect(connectionId, peerId);
+                }
+            }, 
+            threadPool, 
+            () -> handleDisconnect(connectionId, null)
+        );
+    }
+
+    /**
+     * Intercepts messages. If the connection is pending, it evaluates the handshake.
+     * If established, it passes the message to the UI.
+     */
+    private void routeIncomingMessage(String connectionId, Message message) {
+        if (pendingConnections.containsKey(connectionId)) {
+            processHandshake(connectionId, message);
+        } else {
+            // Connection is established. Handle normal chat traffic.
+            if (message.getType() == MessageType.MSG) {
+                ui.onMessageReceived(message);
+            } else if (message.getType() == MessageType.CLOSE) {
+                ui.displaySystemMessage(message.getSenderId() + " left the chat.");
+                PeerConnection pc = activeChats.remove(message.getSenderId());
+                if (pc != null) pc.close();
+            }
+        }
+    }
+
+    /**
+     * Enforces the protocol: The first message MUST be an INIT or ACK.
+     */
+    private void processHandshake(String tempId, Message message) {
+        PeerConnection pc = pendingConnections.remove(tempId);
+        if (pc == null || !pc.isAlive()) return;
+
+        try {
+            // Remove the 5-second socket timeout now that they have responded
+            pc.getSocket().setSoTimeout(0); 
+        } catch (IOException e) {
+            // Ignore if already closed
+        }
+
+        String peerId = message.getSenderId();
+
+        if (message.getType() == MessageType.INIT) {
+            // They initiated. We received INIT, we reply with ACK.
+            activeChats.put(peerId, pc);
+            pc.sendMessage(new Message(MessageType.ACK, myId, "Connection Accepted"));
+            ui.displaySystemMessage("Connection established with " + peerId);
+
+        } else if (message.getType() == MessageType.ACK) {
+            // We initiated. We received their ACK.
+            activeChats.put(peerId, pc);
+            ui.displaySystemMessage("Successfully connected to " + peerId);
+
+        } else {
+            // PROTOCOL VIOLATION: First message was not INIT or ACK.
+            ui.displayError("Protocol violation from peer. Dropping connection.");
+            pc.close();
+        }
+    }
+
+    /**
+     * Public method for the UI to send standard chat messages.
+     */
+    public void sendChatMessage(String peerId, String payload) {
+        PeerConnection pc = activeChats.get(peerId);
+        if (pc != null && pc.isAlive()) {
+            pc.sendMessage(new Message(MessageType.MSG, myId, payload));
+        } else {
+            ui.displayError("You are not connected to " + peerId);
+        }
+    }
+
+    private void handleDisconnect(String tempId, String peerId) {
+        pendingConnections.remove(tempId);
+        if (peerId != null) {
+            activeChats.remove(peerId);
+        }
+    }
+
+    /**
+     * Requirement: Close all connections and exit safely.
+     */
+    public void shutdownAll() {
+        System.out.println("[System] Shutting down all chats...");
+        Message closeMsg = new Message(MessageType.CLOSE, myId, "Going offline");
+        
+        for (PeerConnection pc : activeChats.values()) {
+            pc.sendMessage(closeMsg);
+            // Small sleep to give the background sender thread time to flush the CLOSE message
+            try { Thread.sleep(50); } catch (InterruptedException e) {}
+            pc.close();
+        }
+        activeChats.clear();
+        pendingConnections.clear();
+    }
+}
