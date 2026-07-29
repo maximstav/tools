@@ -1,0 +1,228 @@
+package com.yourname.p2pchat.core;
+
+import com.yourname.p2pchat.domain.Group;
+import com.yourname.p2pchat.domain.GroupInviteData;
+import com.yourname.p2pchat.domain.Message;
+import com.yourname.p2pchat.domain.MessageType;
+import com.yourname.p2pchat.domain.PeerAddress;
+import com.yourname.p2pchat.ui.ChatUI;
+import com.yourname.p2pchat.util.JsonUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class GroupManager {
+private final String myId;
+private final String myIp;
+private final int myPort;
+private final ChatSessionManager sessionManager;
+private final ChatUI ui;
+
+private final Map<String, Group> activeGroups = new ConcurrentHashMap<>();
+// Keep track of peer IP/Port when we connect to them, so we can invite them later
+private final Map<String, PeerAddress> knownPeers = new ConcurrentHashMap<>();
+
+public GroupManager(String myId, String myIp, int myPort, ChatSessionManager sessionManager, ChatUI ui) {
+this.myId = myId;
+this.myIp = myIp;
+this.myPort = myPort;
+this.sessionManager = sessionManager;
+this.ui = ui;
+}
+
+public void registerKnownPeer(String peerId, String ip, int port) {
+knownPeers.put(peerId, new PeerAddress(peerId, ip, port));
+}
+
+public void createGroup(String groupId, String groupName) {
+if (activeGroups.containsKey(groupId)) {
+ui.displayError("Group " + groupId + " already exists.");
+return;
+}
+Group group = new Group(groupId, groupName);
+group.addMember(myId);
+activeGroups.put(groupId, group);
+ui.displaySystemMessage("Group '" + groupName + "' created with ID: " + groupId);
+}
+
+public void inviteToGroup(String groupId, String targetPeerId) {
+Group group = activeGroups.get(groupId);
+if (group == null) {
+ui.displayError("You are not in a group with ID " + groupId);
+return;
+}
+if (!sessionManager.isConnected(targetPeerId)) {
+ui.displayError("You must be directly connected to " + targetPeerId + " to invite them.");
+return;
+}
+
+// Build the current member list to send to the new user
+List<PeerAddress> currentMembers = new ArrayList<>();
+currentMembers.add(new PeerAddress(myId, myIp, myPort)); // Add myself
+
+for (String memberId : group.getMemberIds()) {
+if (!memberId.equals(myId) && knownPeers.containsKey(memberId)) {
+currentMembers.add(knownPeers.get(memberId));
+}
+}
+
+GroupInviteData inviteData = new GroupInviteData(groupId, group.getGroupName(), currentMembers);
+String payloadJson = JsonUtil.serializeInvite(inviteData);
+
+Message inviteMsg = new Message(MessageType.GROUP_INVITE, myId, payloadJson, groupId);
+sessionManager.sendRawMessage(targetPeerId, inviteMsg);
+
+ui.displaySystemMessage("Invited " + targetPeerId + " to " + group.getGroupName());
+}
+
+public void handleGroupInvite(Message msg) {
+GroupInviteData data = JsonUtil.deserializeInvite(msg.getPayload());
+if (data == null) return;
+
+ui.displaySystemMessage(msg.getSenderId() + " invited you to group: " + data.getGroupName() + " (" + data.getGroupId() + ")");
+
+// 1. Join the group locally
+Group group = activeGroups.computeIfAbsent(data.getGroupId(), id -> new Group(id, data.getGroupName()));
+group.addMember(myId);
+group.addMember(msg.getSenderId());
+
+// 2. Build the mesh (connect to anyone in the group we don't already know)
+for (PeerAddress address : data.getCurrentMembers()) {
+group.addMember(address.getPeerId());
+registerKnownPeer(address.getPeerId(), address.getIp(), address.getPort());
+
+if (!address.getPeerId().equals(myId) && !sessionManager.isConnected(address.getPeerId())) {
+ui.displaySystemMessage("Mesh linking: Connecting to group member " + address.getPeerId() + "...");
+sessionManager.connectToPeer(address.getIp(), address.getPort());
+}
+}
+}
+
+public void broadcastMessage(String groupId, String text) {
+Group group = activeGroups.get(groupId);
+if (group == null) {
+ui.displayError("You are not in group " + groupId);
+return;
+}
+
+Message groupMsg = new Message(MessageType.GROUP_MSG, myId, text, groupId);
+for (String peerId : group.getMemberIds()) {
+if (!peerId.equals(myId)) {
+sessionManager.sendRawMessage(peerId, groupMsg);
+}
+}
+}
+
+public void handleIncomingGroupMessage(Message msg) {
+Group group = activeGroups.get(msg.getGroupId());
+String groupName = (group != null) ? group.getGroupName() : msg.getGroupId();
+
+System.out.println("\n\u001B[35m[" + msg.getTimestamp() + "] [Group-" + groupName + "] "
++ msg.getSenderId() + ": " + msg.getPayload() + "\u001B[0m");
+}
+
+public void handlePeerDisconnect(String peerId) {
+for (Group group : activeGroups.values()) {
+group.removeMember(peerId);
+}
+}
+}
+
+// Inside ChatSessionManager.java
+
+private GroupManager groupManager; // Add this field
+
+// Add a setter to resolve the circular dependency with GroupManager
+public void setGroupManager(GroupManager groupManager) {
+this.groupManager = groupManager;
+}
+
+// Add this helper for the GroupManager
+public boolean isConnected(String peerId) {
+return activeChats.containsKey(peerId);
+}
+
+// Add this pass-through for the GroupManager
+public boolean sendRawMessage(String peerId, Message message) {
+PeerConnection pc = activeChats.get(peerId);
+if (pc != null && pc.isAlive()) {
+return pc.sendMessage(message);
+}
+return false;
+}
+
+// UPDATE your existing routeIncomingMessage method:
+private void routeIncomingMessage(String connectionId, Message message) {
+if (pendingConnections.containsKey(connectionId)) {
+processHandshake(connectionId, message);
+} else {
+// Normal routing
+switch (message.getType()) {
+case MSG:
+ui.onMessageReceived(message);
+break;
+case GROUP_INVITE:
+if (groupManager != null) groupManager.handleGroupInvite(message);
+break;
+case GROUP_MSG:
+if (groupManager != null) groupManager.handleIncomingGroupMessage(message);
+break;
+case CLOSE:
+ui.displaySystemMessage(message.getSenderId() + " left the chat.");
+PeerConnection pc = activeChats.remove(message.getSenderId());
+if (pc != null) pc.close();
+break;
+default:
+break;
+}
+}
+}
+
+// UPDATE your handleDisconnect method:
+private void handleDisconnect(String tempId, String peerId) {
+pendingConnections.remove(tempId);
+if (peerId != null) {
+activeChats.remove(peerId);
+if (groupManager != null) groupManager.handlePeerDisconnect(peerId);
+}
+}
+
+// Add this field and setter to ConsoleUI
+private GroupManager groupManager;
+public void setGroupManager(GroupManager groupManager) { this.groupManager = groupManager; }
+
+// Inside processCommand(String input):
+// ... existing /connect and @peerId logic ...
+
+else if (input.startsWith("/creategroup ")) {
+// /creategroup G1 Interns
+String[] parts = input.split(" ", 3);
+if (parts.length >= 3) {
+groupManager.createGroup(parts[1], parts[2]);
+} else {
+displayError("Usage: /creategroup <groupId> <groupName>");
+}
+}
+else if (input.startsWith("/invite ")) {
+// /invite G1 Bob
+String[] parts = input.split(" ");
+if (parts.length == 3) {
+groupManager.inviteToGroup(parts[1], parts[2]);
+} else {
+displayError("Usage: /invite <groupId> <peerId>");
+}
+}
+else if (input.startsWith("#")) {
+// #G1 Hello everyone!
+int spaceIndex = input.indexOf(" ");
+if (spaceIndex != -1) {
+String groupId = input.substring(1, spaceIndex);
+String message = input.substring(spaceIndex + 1);
+groupManager.broadcastMessage(groupId, message);
+System.out.println("[You -> Group-" + groupId + "]: " + message);
+}
+}
+
+4
