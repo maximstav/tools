@@ -1,0 +1,203 @@
+dependencies {
+// Jakarta WebSocket API
+implementation 'jakarta.websocket:jakarta.websocket-api:2.1.1'
+
+// Tyrus implementation (Standalone Grizzly server & client)
+implementation 'org.glassfish.tyrus:tyrus-server:2.1.3'
+implementation 'org.glassfish.tyrus:tyrus-container-grizzly-server:2.1.3'
+implementation 'org.glassfish.tyrus:tyrus-client:2.1.3'
+implementation 'org.glassfish.tyrus:tyrus-container-grizzly-client:2.1.3'
+
+// Gson for JSON
+implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+//≈===============÷÷======
+
+package com.yourname.p2pchat.network;
+
+import com.yourname.p2pchat.core.ChatSessionManager;
+import jakarta.websocket.*;
+import jakarta.websocket.server.ServerEndpoint;
+import jakarta.websocket.server.ServerEndpointConfig;
+
+// The endpoint URL peers will connect to
+@ServerEndpoint(value = "/chat", configurator = ChatServerEndpoint.EndpointConfigurator.class)
+public class ChatServerEndpoint {
+
+private final ChatSessionManager sessionManager;
+
+// Injected via the Configurator
+public ChatServerEndpoint(ChatSessionManager sessionManager) {
+this.sessionManager = sessionManager;
+}
+
+@OnOpen
+public void onOpen(Session session) {
+sessionManager.onInboundConnection(session);
+}
+
+@OnMessage
+public void onMessage(String message, Session session) {
+sessionManager.onMessageReceived(session, message);
+}
+
+@OnClose
+public void onClose(Session session, CloseReason reason) {
+sessionManager.onConnectionClosed(session);
+}
+
+@OnError
+public void onError(Session session, Throwable throwable) {
+System.err.println("[Error] WebSocket Server Error: " + throwable.getMessage());
+}
+
+// --- CONFIGURATOR FOR DEPENDENCY INJECTION ---
+public static class EndpointConfigurator extends ServerEndpointConfig.Configurator {
+private static ChatSessionManager globalSessionManager;
+
+public static void setSessionManager(ChatSessionManager sm) {
+globalSessionManager = sm;
+}
+
+@Override
+public <T> T getEndpointInstance(Class<T> endpointClass) {
+return (T) new ChatServerEndpoint(globalSessionManager);
+}
+}
+}
+
+//========_=_=<=<=<=<=<=<=<============
+package com.yourname.p2pchat.network;
+
+import com.yourname.p2pchat.core.ChatSessionManager;
+import jakarta.websocket.*;
+
+@ClientEndpoint
+public class ChatClientEndpoint {
+
+private final ChatSessionManager sessionManager;
+
+public ChatClientEndpoint(ChatSessionManager sessionManager) {
+this.sessionManager = sessionManager;
+}
+
+@OnOpen
+public void onOpen(Session session) {
+sessionManager.onOutboundConnectionOpened(session);
+}
+
+@OnMessage
+public void onMessage(String message, Session session) {
+sessionManager.onMessageReceived(session, message);
+}
+
+@OnClose
+public void onClose(Session session, CloseReason reason) {
+sessionManager.onConnectionClosed(session);
+}
+
+@OnError
+public void onError(Session session, Throwable throwable) {
+System.err.println("[Error] WebSocket Client Error: " + throwable.getMessage());
+}
+}
+
+//========_===============
+
+private final Map<Session, ConnectionDirection> pendingConnections = new ConcurrentHashMap<>();
+private final Map<String, Session> activeChats = new ConcurrentHashMap<>();
+private final Map<Session, String> socketToPeerId = new ConcurrentHashMap<>();
+
+//===============
+
+// OLD: conn.send(json);
+// NEW:
+conn.getBasicRemote().sendText(json);
+
+////===================
+import jakarta.websocket.ContainerProvider;
+import jakarta.websocket.WebSocketContainer;
+import java.net.URI;
+
+public void connectToPeer(String ip, int port) {
+try {
+URI uri = new URI("ws://" + ip + ":" + port + "/chat");
+
+// This is how Jakarta WebSockets initiates a client connection
+WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+container.connectToServer(new ChatClientEndpoint(this), uri);
+
+} catch (Exception e) {
+ui.displayError("Failed to connect: " + e.getMessage());
+}
+}
+
+// Add this callback for the ChatClientEndpoint to trigger when it succeeds
+public void onOutboundConnectionOpened(Session session) {
+pendingConnections.put(session, ConnectionDirection.OUTBOUND);
+
+// We initiated, so we speak first
+Message initMsg = new Message(MessageType.INIT, myId, "Requesting connection");
+try {
+session.getBasicRemote().sendText(JsonUtil.serialize(initMsg));
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+
+//////==============>=>=>>=>=>=<<=<=====
+package com.yourname.p2pchat;
+
+import com.yourname.p2pchat.core.ChatSessionManager;
+import com.yourname.p2pchat.core.GroupManager;
+import com.yourname.p2pchat.network.ChatServerEndpoint;
+import com.yourname.p2pchat.ui.ConsoleUI;
+import org.glassfish.tyrus.server.Server;
+
+import java.util.Scanner;
+
+public class Main {
+public static void main(String[] args) {
+Scanner scanner = new Scanner(System.in);
+
+System.out.print("Enter your username: ");
+String myId = scanner.nextLine().trim();
+
+System.out.print("Enter port to listen on: ");
+int listenPort = Integer.parseInt(scanner.nextLine().trim());
+String myIp = "127.0.0.1";
+
+ConsoleUI ui = new ConsoleUI();
+ChatSessionManager sessionManager = new ChatSessionManager(myId, ui);
+GroupManager groupManager = new GroupManager(myId, myIp, listenPort, sessionManager, ui);
+
+ui.setSessionManager(sessionManager);
+ui.setGroupManager(groupManager);
+sessionManager.setGroupManager(groupManager);
+
+// Inject the SessionManager into the Server Endpoint Configurator
+ChatServerEndpoint.EndpointConfigurator.setSessionManager(sessionManager);
+
+// Start the standalone WebSocket server
+// Parameters: hostname, port, root path, endpoint class
+Server server = new Server("0.0.0.0", listenPort, "", null, ChatServerEndpoint.class);
+
+try {
+server.start();
+System.out.println("[System] WebSocket Server started on ws://0.0.0.0:" + listenPort + "/chat");
+
+// Block the main thread with the UI loop
+ui.start();
+
+} catch (Exception e) {
+System.err.println("Fatal Error: " + e.getMessage());
+} finally {
+System.out.println("Executing graceful shutdown...");
+sessionManager.shutdownAll();
+server.stop();
+System.out.println("Application terminated.");
+System.exit(0);
+}
+}
+}
