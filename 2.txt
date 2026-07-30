@@ -1,0 +1,202 @@
+package com.yourname.p2pchat.core;
+
+import com.yourname.p2pchat.domain.Message;
+import com.yourname.p2pchat.domain.MessageType;
+import com.yourname.p2pchat.ui.ChatUI;
+import com.yourname.p2pchat.util.JsonUtil;
+import org.java_websocket.WebSocket;
+
+import java.net.URI;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class ChatSessionManager {
+private final String myId;
+private final ChatUI ui;
+private GroupManager groupManager; // From our previous mesh implementation
+
+// Track pending connections by the WebSocket object itself, mapping to its direction
+private final Map<WebSocket, ConnectionDirection> pendingConnections = new ConcurrentHashMap<>();
+
+// Fully established connections mapped by the peer's username
+private final Map<String, WebSocket> activeChats = new ConcurrentHashMap<>();
+
+// Reverse lookup map to easily clean up when a WebSocket drops unexpectedly
+private final Map<WebSocket, String> socketToPeerId = new ConcurrentHashMap<>();
+
+public ChatSessionManager(String myId, ChatUI ui) {
+this.myId = myId;
+this.ui = ui;
+}
+
+public void setGroupManager(GroupManager groupManager) {
+this.groupManager = groupManager;
+}
+
+// --- CONNECTION HANDLING ---
+
+/**
+* Called by ChatServer when someone connects to our listening port.
+*/
+public void onInboundConnection(WebSocket conn) {
+// We set it as INBOUND, meaning we sit back and wait for them to send an INIT
+pendingConnections.put(conn, ConnectionDirection.INBOUND);
+}
+
+/**
+* Called by the UI to initiate a connection.
+*/
+public void connectToPeer(String ip, int port) {
+try {
+URI uri = new URI("ws://" + ip + ":" + port);
+
+// Create the client and define the onOpen behavior inline
+ChatClient client = new ChatClient(uri, this) {
+@Override
+public void onOpen(org.java_websocket.handshake.ServerHandshake handshakedata) {
+// When the TCP connection succeeds, register it as OUTBOUND
+pendingConnections.put(this, ConnectionDirection.OUTBOUND);
+
+// Since we initiated, WE must send the INIT message first
+Message initMsg = new Message(MessageType.INIT, myId, "Requesting connection");
+this.send(JsonUtil.serialize(initMsg));
+}
+};
+
+client.connect(); // This runs asynchronously in the background
+} catch (Exception e) {
+ui.displayError("Invalid connection address.");
+}
+}
+
+// --- MESSAGE ROUTING ---
+
+/**
+* Called by both ChatServer and ChatClient whenever a string is received.
+*/
+public void onMessageReceived(WebSocket conn, String jsonMessage) {
+Message message = JsonUtil.deserialize(jsonMessage);
+
+if (message == null) {
+System.err.println("[System] Received malformed JSON. Dropping connection.");
+conn.close();
+return;
+}
+
+// If this socket is still in the pending map, route it to the handshake logic
+if (pendingConnections.containsKey(conn)) {
+processHandshake(conn, message);
+} else {
+// It's an established connection. Route normally based on type.
+switch (message.getType()) {
+case MSG:
+ui.onMessageReceived(message);
+break;
+case GROUP_INVITE:
+if (groupManager != null) groupManager.handleGroupInvite(message);
+break;
+case GROUP_MSG:
+if (groupManager != null) groupManager.handleIncomingGroupMessage(message);
+break;
+case CLOSE:
+handleGracefulClose(conn, message);
+break;
+default:
+break;
+}
+}
+}
+
+// --- PROTOCOL HANDSHAKE ---
+
+private void processHandshake(WebSocket conn, Message message) {
+ConnectionDirection direction = pendingConnections.remove(conn);
+String peerId = message.getSenderId();
+
+if (direction == ConnectionDirection.INBOUND && message.getType() == MessageType.INIT) {
+// They initiated. We received INIT. We must reply with ACK.
+registerActiveConnection(peerId, conn);
+
+Message ack = new Message(MessageType.ACK, myId, "Connection Accepted");
+conn.send(JsonUtil.serialize(ack));
+ui.displaySystemMessage("Connection established with " + peerId);
+
+} else if (direction == ConnectionDirection.OUTBOUND && message.getType() == MessageType.ACK) {
+// We initiated. We received their ACK.
+registerActiveConnection(peerId, conn);
+ui.displaySystemMessage("Successfully connected to " + peerId);
+
+} else {
+// PROTOCOL VIOLATION! (e.g., received MSG before INIT, or ACK when expecting INIT)
+ui.displayError("Protocol violation from peer. Dropping connection.");
+conn.close();
+}
+}
+
+private void registerActiveConnection(String peerId, WebSocket conn) {
+activeChats.put(peerId, conn);
+socketToPeerId.put(conn, peerId);
+}
+
+// --- SENDING DATA ---
+
+public boolean isConnected(String peerId) {
+return activeChats.containsKey(peerId);
+}
+
+public void sendChatMessage(String peerId, String payload) {
+Message msg = new Message(MessageType.MSG, myId, payload);
+sendRawMessage(peerId, msg);
+}
+
+/**
+* Used by GroupManager to send GROUP_MSG and GROUP_INVITE objects.
+*/
+public boolean sendRawMessage(String peerId, Message message) {
+WebSocket conn = activeChats.get(peerId);
+if (conn != null && conn.isOpen()) {
+conn.send(JsonUtil.serialize(message));
+return true;
+}
+return false;
+}
+
+// --- DISCONNECT HANDLING ---
+
+private void handleGracefulClose(WebSocket conn, Message message) {
+ui.displaySystemMessage(message.getSenderId() + " left the chat.");
+conn.close(); // Close our end of the WebSocket
+}
+
+/**
+* Called by Server/Client when the WebSocket physical connection drops.
+*/
+public void onConnectionClosed(WebSocket conn) {
+pendingConnections.remove(conn);
+
+String peerId = socketToPeerId.remove(conn);
+if (peerId != null) {
+activeChats.remove(peerId);
+ui.onPeerDisconnected(peerId, "Connection lost");
+
+if (groupManager != null) {
+groupManager.handlePeerDisconnect(peerId);
+}
+}
+}
+
+public void shutdownAll() {
+System.out.println("[System] Shutting down all chats...");
+Message closeMsg = new Message(MessageType.CLOSE, myId, "Going offline");
+String closeJson = JsonUtil.serialize(closeMsg);
+
+for (WebSocket conn : activeChats.values()) {
+if (conn.isOpen()) {
+conn.send(closeJson);
+conn.close();
+}
+}
+activeChats.clear();
+socketToPeerId.clear();
+}
+}
