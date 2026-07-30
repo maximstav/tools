@@ -1,0 +1,108 @@
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
+import java.net.InetSocketAddress;
+
+public class ChatServer extends WebSocketServer {
+
+// Pass a callback to the SessionManager, just like before
+private final SessionManagerCallback sessionManager;
+
+public ChatServer(int port, SessionManagerCallback sessionManager) {
+super(new InetSocketAddress(port));
+this.sessionManager = sessionManager;
+}
+
+@Override
+public void onOpen(WebSocket conn, ClientHandshake handshake) {
+System.out.println("[System] Incoming WebSocket connection from " + conn.getRemoteSocketAddress());
+// Pass the new connection up to the ChatSessionManager to await the INIT JSON
+sessionManager.onNewConnection(conn);
+}
+
+@Override
+public void onClose(WebSocket conn, int code, String reason, boolean remote) {
+sessionManager.onConnectionClosed(conn);
+}
+
+@Override
+public void onMessage(WebSocket conn, String message) {
+// The library reads the full JSON string for you. No more BufferedReader!
+sessionManager.onMessageReceived(conn, message);
+}
+
+@Override
+public void onError(WebSocket conn, Exception ex) {
+System.err.println("[Error] Server error: " + ex.getMessage());
+}
+
+@Override
+public void onStart() {
+System.out.println("WebSocket Server started on port " + getPort());
+}
+}
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+import java.net.URI;
+
+public class ChatClient extends WebSocketClient {
+
+private final SessionManagerCallback sessionManager;
+
+public ChatClient(URI serverUri, SessionManagerCallback sessionManager) {
+super(serverUri);
+this.sessionManager = sessionManager;
+}
+
+@Override
+public void onOpen(ServerHandshake handshakedata) {
+// We successfully connected to a peer.
+// We pass 'this' (since ChatClient implements the WebSocket interface) to the manager
+sessionManager.onNewConnection(this);
+}
+
+@Override
+public void onMessage(String message) {
+sessionManager.onMessageReceived(this, message);
+}
+
+@Override
+public void onClose(int code, String reason, boolean remote) {
+sessionManager.onConnectionClosed(this);
+}
+
+@Override
+public void onError(Exception ex) {
+System.err.println("[Error] Client error: " + ex.getMessage());
+}
+}
+
+// Inside ChatSessionManager (Snippet)
+
+// Instead of Map<String, PeerConnection>, you store Map<String, WebSocket>
+private final Map<String, WebSocket> activeChats = new ConcurrentHashMap<>();
+
+public void sendChatMessage(String peerId, String payload) {
+WebSocket conn = activeChats.get(peerId);
+
+if (conn != null && conn.isOpen()) {
+Message msg = new Message(MessageType.MSG, myId, payload);
+String json = JsonUtil.serialize(msg);
+
+// This single line replaces the entire MessageSender class and BlockingQueue!
+conn.send(json);
+}
+}
+
+public void connectToPeer(String ip, int port) {
+try {
+URI uri = new URI("ws://" + ip + ":" + port);
+ChatClient client = new ChatClient(uri, this);
+
+// connect() is asynchronous. It will trigger onOpen() when successful
+client.connect();
+} catch (Exception e) {
+ui.displayError("Invalid URI format.");
+}
+}
