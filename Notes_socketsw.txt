@@ -106,3 +106,85 @@ client.connect();
 ui.displayError("Invalid URI format.");
 }
 }
+
+
+
+
+
+
+
+
+// 1. UPDATE THIS EXISTING METHOD
+public void handleGroupInvite(Message msg) {
+    GroupInviteData data = JsonUtil.deserializeInvite(msg.getPayload());
+    if (data == null) return;
+
+    ui.displaySystemMessage(msg.getSenderId() + " invited you to group: " + data.getGroupName());
+
+    Group group = activeGroups.computeIfAbsent(data.getGroupId(), id -> new Group(id, data.getGroupName()));
+    group.addMember(myId);
+    group.addMember(msg.getSenderId());
+
+    for (PeerAddress address : data.getCurrentMembers()) {
+        group.addMember(address.getPeerId());
+        registerKnownPeer(address.getPeerId(), address.getIp(), address.getPort());
+        
+        if (!address.getPeerId().equals(myId) && !sessionManager.isConnected(address.getPeerId())) {
+            ui.displaySystemMessage("Mesh linking: Connecting to " + address.getPeerId() + "...");
+            sessionManager.connectToPeer(address.getIp(), address.getPort());
+        }
+    }
+
+    // NEW: The Announcement Logic
+    // We run this in a background thread with a short delay to ensure the mesh 
+    // handshakes (INIT/ACK) finish before we try to send messages.
+    new Thread(() -> {
+        try {
+            Thread.sleep(1000); // 1 second delay
+            PeerAddress myAddress = new PeerAddress(myId, myIp, myPort);
+            String payload = JsonUtil.serializeAddress(myAddress);
+            Message joinMsg = new Message(MessageType.GROUP_JOIN, myId, payload, data.getGroupId());
+
+            // Announce to everyone in the group that we have arrived
+            for (String peerId : group.getMemberIds()) {
+                if (!peerId.equals(myId)) {
+                    sessionManager.sendRawMessage(peerId, joinMsg);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }).start();
+}
+
+// 2. ADD THIS BRAND NEW METHOD
+public void handleGroupJoin(Message msg) {
+    Group group = activeGroups.get(msg.getGroupId());
+    if (group != null) {
+        // Deserialize the IP/Port info of the new member
+        PeerAddress newMember = JsonUtil.deserializeAddress(msg.getPayload());
+        
+        if (newMember != null && !group.getMemberIds().contains(newMember.getPeerId())) {
+            group.addMember(newMember.getPeerId());
+            registerKnownPeer(newMember.getPeerId(), newMember.getIp(), newMember.getPort());
+            
+            ui.displaySystemMessage("[System] " + newMember.getPeerId() + " joined group '" + group.getGroupName() + "'");
+        }
+    }
+}
+
+// 3. UPDATE THIS METHOD (Adding the Self-Healing safety net)
+public void handleIncomingGroupMessage(Message msg) {
+    Group group = activeGroups.get(msg.getGroupId());
+    String groupName = (group != null) ? group.getGroupName() : msg.getGroupId();
+    
+    // NEW: Self-Healing Logic. If we receive a message from someone we didn't know 
+    // was in the group, add them immediately!
+    if (group != null && !group.getMemberIds().contains(msg.getSenderId())) {
+        group.addMember(msg.getSenderId());
+        // Note: We don't have their IP/Port here, but at least we can now route messages back to them!
+    }
+    
+    System.out.println("\n\u001B[35m[" + msg.getTimestamp() + "] [Group-" + groupName + "] " 
+            + msg.getSenderId() + ": " + msg.getPayload() + "\u001B[0m");
+}
