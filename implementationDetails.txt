@@ -1,0 +1,77 @@
+This is an exciting moment! Getting to the end of the internship and aiming for a return offer is a huge milestone.
+To give you the best chance at that graduate role, we need to frame your answers to show growth, impact, and cultural fit. We'll map your answers directly to the objectives you set at the beginning, weave in the enthusiasm you showed in your 2-week feedback, and structure your responses around LSEG’s core values (Connect, Create, Deliver).
+Here is a guide and draft responses for your form. You can adjust the text in the [brackets] to fit the exact details of your final project.
+🌟 The Critical Questions (Open-Ended)
+These first two questions are your main pitch for a return offer. They show what you achieved and how you behave as a professional.
+1. The "What": "What" results have you delivered against your objectives during this programme?
+Advice: Map this directly to the 5 objectives you set at the start. Keep it punchy and results-oriented.
+Draft Answer: "Over the course of the programme, I have successfully delivered against all my initial objectives, transitioning from intensive training to practical execution.
+▪ Mastering Java & System Architecture: I leveraged the initial intensive training to build a strong foundation in professional Java development. I applied these best practices directly into our final project, taking time to understand how LSEG's need for high reliability and scale shapes the business logic.
+▪ Independent Execution & Full-Stack Delivery: I took ownership of my assigned modules in the final project, successfully integrating our Java backend with the React frontend. I was able to troubleshoot independently while knowing exactly when to escalate complex issues to my Buddy.
+▪ Building a Network & Collaboration: Building on the excellent induction weeks, I actively fostered relationships with my People Leader, Mentor, and fellow interns, ensuring smooth collaboration on our final deliverables. Ultimately, these results have solidified my goal of securing a permanent engineering role here, as I now have practical experience delivering impactful tech in this environment."
+2. The "How": "How" have you demonstrated the LSEG Values to achieve results during this programme?
+Advice: LSEG’s core values are Connect, Create, Deliver. Explicitly using these words will show that you are fully aligned with their corporate culture.
+Draft Answer: "I consciously aligned my daily work with LSEG's core values:
+▪ Connect: I actively engaged with my People Leader and Mentor, fostering an open feedback loop. Just as I noted in my initial weeks, the welcoming culture made it natural to collaborate. I partnered closely with my team during the final project to ensure our Java and React components integrated seamlessly.
+▪ Create: I embraced the technical complexity of our tasks. During the final project, I didn't just write code; I looked for innovative ways to apply the best practices we learned during the intensive training to build a robust, scalable solution.
+▪ Deliver: I demonstrated strong independent execution by taking ownership of my assigned project features. I ensured my code was reliable, met our deadlines, and maintained the high performance required in a critical financial services environment."
+📊 The Scale/Rating Questions
+For the following questions, assuming they are "Strongly Disagree" to "Strongly Agree" (or 1-5 scales), you should select the highest positive option (e.g., Strongly Agree / 5) if your goal is to be hired. The Early Careers team tracks these metrics, and positive scores reflect well on your specific team in Cluj.
+• Programme: I would recommend the LSEG Internship Programme to a peer.(Strongly Agree)
+• Programme: As a result of the programme, I have a deeper insight into my strengths and areas of interest.(Strongly Agree)
+• Programme: The programme has developed both my soft and technical skills.(Strongly Agree)
+• Programme: As a result of the programme, I feel better equipped to succeed in a full time role post university, in a financial services environment.(Strongly Agree)
+• Programme: I felt supported by the Early Careers team.(Strongly Agree)
+• Placement: I felt supported by my People Leader / team.(Strongly Agree)
+• Placement: I was assigned tasks / projects that enabled me to build my skills / knowledge.(Strongly Agree)
+• Placement: I would recommend including this placement for next year's internship programme.(Strongly Agree)
+💬 Supporting Comments & Feedback
+Placement: Any comments on your experience, to support the above?
+Draft Answer: "The balance of autonomy and support was excellent. The intensive training in the first few weeks provided the exact technical foundation I needed for the Java/React final project. Furthermore, the continuous support from my People Leader and Buddy made a huge difference; they were always approachable, clearly communicated expectations, and helped me navigate the technical complexity of LSEG's systems."
+Programme: What worked well about the programme?
+Draft Answer: "The structure of the programme was highly effective. Dedicating the first few days to interactive networking and culture-building removed the immediate pressure and helped us build a support system. Following that with intensive technical training ensured we were fully prepared to tackle the final project. The opportunity to speak with former interns was also incredibly motivating and gave clear visibility into the graduate career path."
+Programme: What would have been 'even better if'?
+Advice: Keep this constructive. You want to sound eager to learn more, not like you are complaining.
+Draft Answer: "It would have been 'even better if' there were a few more opportunities to shadow senior engineers on live systems outside of our immediate project scope. Seeing how massive amounts of critical data are handled in real-time by the wider Cluj team would have provided even more context for the business logic we were learning."
+Do you have an idea of the type of role? Or an idea of what you DON'T want to do? Please provide detail.
+Advice: Be decisive. Companies love interns who know what they want. Tie it back to the tech stack you used.
+Draft Answer: "Yes, I am highly interested in returning as a Graduate Software Engineer, ideally in a Backend or Full-Stack capacity. I thoroughly enjoyed working with Java and React during this internship. I am drawn to the technical complexity, scale, and performance requirements of the systems built here in Cluj. I want to continue developing my engineering skills in a role where I can contribute to high-reliability applications that drive the financial industry."
+Final Tip before you submit: Read through your tailored answers one more time to ensure they sound like your voice. Good luck! You've set great objectives, and your enthusiasm for the technology will absolutely shine through to the hiring managers.
+
+============================
+
+🌟 Core Performance & Values
+• The "What": "What" results have you delivered against your objectives during this programme?
+Over the course of the programme, I have successfully delivered against all my initial objectives, transitioning from intensive training to practical execution. I leveraged the initial training to build a strong foundation in professional Java development, applying best practices directly to our final project while understanding how LSEG's need for scale shapes business logic. I took independent ownership of my assigned modules, successfully integrating our Java backend with the React frontend, and actively built a strong professional network with my team and mentors. These milestones have solidified my readiness for a permanent engineering role.
+• The "How": "How" have you demonstrated the LSEG Values to achieve results during this programme?
+I consciously aligned my daily work with LSEG's core values:
+▪ Connect: I actively engaged with my People Leader and Mentor, fostering an open feedback loop and collaborating seamlessly with my peers during the final project.
+▪ Create: I embraced the technical complexity of our tasks, looking for innovative ways to apply Java best practices to build robust, scalable solutions.
+▪ Deliver: I demonstrated strong independent execution by taking ownership of my project features, ensuring my code was reliable, met deadlines, and maintained high performance standards.
+📝 Programme Feedback (Text-Based Statements)
+• Programme: I would recommend the LSEG Internship Programme to a peer.
+I would strongly recommend it because it offers a rare combination of intensive technical training, real-world project experience, and a genuinely welcoming culture. The mentorship in Cluj is world-class, and interns are given real insight into high-scale financial technology rather than just doing peripheral tasks.
+• Programme: As a result of the programme, I have a deeper insight into my strengths and areas of interest.
+Working through backend Java development alongside the React final project helped me realize my strong affinity for full-stack architecture and high-performance systems. I've gained absolute clarity on how I want to grow as a software engineer and where I can add the most value.
+• Programme: The programme has developed both my soft and technical skills.
+Technically, I’ve deeply enhanced my Java skills, architectural understanding, and frontend integration with React. On the soft skills side, collaborating closely with mentors and teammates improved my technical communication, time management, and independent problem-solving.
+• Programme: As a result of the programme, I feel better equipped to succeed in a full time role post university, in a financial services environment.
+The programme bridged the gap nicely between university theory and enterprise-grade software engineering. Understanding the criticality of performance, reliability, and scale in financial systems makes me feel completely prepared to step into a graduate role.
+• Programme: I felt supported by the Early Careers team.
+The Early Careers team created a seamless onboarding experience. From the initial 3-day induction that eased us into the company culture to their continuous check-ins, I always felt guided, supported, and valued.
+🏢 Placement Feedback
+• Placement: I felt supported by my People Leader / team.
+My People Leader and mentor were exceptionally approachable and supportive. Regular check-ins gave me confidence, and they were always willing to answer questions, clarify expectations, and foster a psychologically safe learning space where I could experiment and grow.
+• Placement: I was assigned tasks / projects that enabled me to build my skills / knowledge.
+The progression from intensive training to building a comprehensive final project was perfectly paced. The tasks directly challenged me to apply professional Java best practices and integrate React, accelerating my practical engineering skills significantly.
+• Placement: I would recommend including this placement for next year's internship programme.
+Yes, this placement provides an ideal ecosystem for interns. The combination of structural guidance, team mentorship, and an impactful final project makes it a gold standard for technical internships in Cluj.
+• Placement: Any comments on your experience, to support the above?
+The balance of autonomy and support was excellent. The intensive training provided the exact technical foundation I needed, and the continuous support from my People Leader and Buddy made a huge difference in navigating LSEG's technical complexity.
+💡 General Reflections & Future Outlook
+• Programme: What worked well about the programme?
+The structure was highly effective. Dedicating the first few days to interactive networking and culture-building removed immediate pressure and helped us build a support system. Following that with intensive technical training ensured we were fully prepared to tackle the final project. Speaking with former interns was also incredibly motivating.
+• Programme: What would have been 'even better if'?
+It would have been 'even better if' there were a few more opportunities to shadow senior engineers on live systems outside of our immediate project scope. Seeing how massive amounts of critical data are handled in real-time by the wider Cluj team would have provided even more context.
+• Do you have an idea of the type of role? Or an idea of what you DON'T want to do? Please provide detail.
+Yes, I am highly interested in returning as a Graduate Software Engineer, ideally in a Backend or Full-Stack capacity. I thoroughly enjoyed working with Java and React during this internship. I am drawn to the technical complexity, scale, and performance requirements of the systems built here in Cluj, and I want to continue developing my engineering skills in a role contributing to high-reliability applications.
