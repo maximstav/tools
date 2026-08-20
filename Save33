@@ -1,0 +1,232 @@
+To add the two new databases with minimal changes to your existing folder structure, the standard approach is to split your **Entities** and **Repositories** into dedicated sub-packages for each database.
+
+Because JPA needs a distinct `EntityManagerFactory` for each physical database, grouping your classes by folder is the cleanest and most maintainable way to route transactions.
+
+---
+
+### Step 1: Update `application.properties`
+
+Replace your generic `spring.datasource.*` lines with three separate blocks. Notice the custom Hikari settings added to each:
+
+```properties
+# ---------------- DATABASE 1 (Primary) ----------------
+app.datasource.db1.jdbc-url=jdbc:postgresql://localhost:5432/db_one
+app.datasource.db1.username=user1
+app.datasource.db1.password=pass1
+app.datasource.db1.driver-class-name=org.postgresql.Driver
+app.datasource.db1.hikari.pool-name=Db1Pool
+app.datasource.db1.hikari.maximum-pool-size=10
+
+# ---------------- DATABASE 2 (Secondary) --------------
+app.datasource.db2.jdbc-url=jdbc:postgresql://remote-host-2:5432/db_two
+app.datasource.db2.username=user2
+app.datasource.db2.password=pass2
+app.datasource.db2.driver-class-name=org.postgresql.Driver
+app.datasource.db2.hikari.pool-name=Db2Pool
+app.datasource.db2.hikari.maximum-pool-size=10
+
+# ---------------- DATABASE 3 (Tertiary) ---------------
+app.datasource.db3.jdbc-url=jdbc:postgresql://remote-host-3:5432/db_three
+app.datasource.db3.username=user3
+app.datasource.db3.password=pass3
+app.datasource.db3.driver-class-name=org.postgresql.Driver
+app.datasource.db3.hikari.pool-name=Db3Pool
+app.datasource.db3.hikari.maximum-pool-size=10
+
+```
+
+---
+
+### Step 2: Minimal Folder Structure Update
+
+Organize your entities and repositories into three sub-packages under your main package:
+
+```text
+com.example.myapp
+├── config
+│   ├── Db1Config.java
+│   ├── Db2Config.java
+│   └── Db3Config.java
+├── db1
+│   ├── UserEntity.java
+│   └── UserRepository.java
+├── db2
+│   ├── OrderEntity.java
+│   └── OrderRepository.java
+└── db3
+    ├── PaymentEntity.java
+    └── PaymentRepository.java
+
+```
+
+---
+
+### Step 3: Java Configuration Classes
+
+#### Database 1 Configuration (`Db1Config.java`)
+
+Mark this one with `@Primary` so Spring knows it is your default database.
+
+```java
+package com.example.myapp.config;
+
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+import javax.sql.DataSource;
+import jakarta.persistence.EntityManagerFactory;
+
+@Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(
+    basePackages = "com.example.myapp.db1",
+    entityManagerFactoryRef = "db1EntityManagerFactory",
+    transactionManagerRef = "db1TransactionManager"
+)
+public class Db1Config {
+
+    @Primary
+    @Bean(name = "db1Properties")
+    @ConfigurationProperties("app.datasource.db1")
+    public DataSourceProperties dataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Primary
+    @Bean(name = "db1DataSource")
+    @ConfigurationProperties("app.datasource.db1.hikari")
+    public DataSource dataSource(@Qualifier("db1Properties") DataSourceProperties properties) {
+        return properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+    }
+
+    @Primary
+    @Bean(name = "db1EntityManagerFactory")
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(
+            EntityManagerFactoryBuilder builder,
+            @Qualifier("db1DataSource") DataSource dataSource) {
+        return builder
+                .dataSource(dataSource)
+                .packages("com.example.myapp.db1")
+                .persistenceUnit("db1")
+                .build();
+    }
+
+    @Primary
+    @Bean(name = "db1TransactionManager")
+    public PlatformTransactionManager transactionManager(
+            @Qualifier("db1EntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+        return new JpaTransactionManager(entityManagerFactory);
+    }
+}
+
+```
+
+#### Database 2 Configuration (`Db2Config.java`)
+
+This configuration is identical to Database 1, but without the `@Primary` annotations:
+
+```java
+package com.example.myapp.config;
+
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+import javax.sql.DataSource;
+import jakarta.persistence.EntityManagerFactory;
+
+@Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(
+    basePackages = "com.example.myapp.db2",
+    entityManagerFactoryRef = "db2EntityManagerFactory",
+    transactionManagerRef = "db2TransactionManager"
+)
+public class Db2Config {
+
+    @Bean(name = "db2Properties")
+    @ConfigurationProperties("app.datasource.db2")
+    public DataSourceProperties dataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean(name = "db2DataSource")
+    @ConfigurationProperties("app.datasource.db2.hikari")
+    public DataSource dataSource(@Qualifier("db2Properties") DataSourceProperties properties) {
+        return properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+    }
+
+    @Bean(name = "db2EntityManagerFactory")
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(
+            EntityManagerFactoryBuilder builder,
+            @Qualifier("db2DataSource") DataSource dataSource) {
+        return builder
+                .dataSource(dataSource)
+                .packages("com.example.myapp.db2")
+                .persistenceUnit("db2")
+                .build();
+    }
+
+    @Bean(name = "db2TransactionManager")
+    public PlatformTransactionManager transactionManager(
+            @Qualifier("db2EntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+        return new JpaTransactionManager(entityManagerFactory);
+    }
+}
+
+```
+
+#### Database 3 Configuration (`Db3Config.java`)
+
+Create this file by copying `Db2Config.java`, replacing every occurrence of `db2` with `db3` (e.g., package to `com.example.myapp.db3`, properties to `app.datasource.db3`, etc.).
+
+---
+
+### Step 4: Using Repositories and Transactions
+
+Your Spring Service classes will work normally via standard dependency injection:
+
+```java
+@Service
+public class OrderService {
+
+    private final UserRepository userRepo;       // Automatically connects to DB1 pool
+    private final OrderRepository orderRepo;     // Automatically connects to DB2 pool
+
+    public OrderService(UserRepository userRepo, OrderRepository orderRepo) {
+        this.userRepo = userRepo;
+        this.orderRepo = orderRepo;
+    }
+
+    // Explicitly declare which transaction manager handles the transaction
+    @Transactional("db2TransactionManager")
+    public void createOrder(OrderEntity order) {
+        orderRepo.save(order);
+    }
+}
+
+```
+
+> **Note:** If your Spring Boot version is older (Spring Boot 2.x), replace the imports containing `jakarta.persistence.*` with `javax.persistence.*`.
+
+Are your databases hosted on the same engine (e.g., all PostgreSQL), or will any of them require different SQL dialects and drivers?
