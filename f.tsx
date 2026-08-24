@@ -27,15 +27,28 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
         onInput={handleInput}
       >
         <AutocompleteList>
-          <AutocompleteGroup initial>
+          <AutocompleteGroup initial className="no-header-group">
             {displayData.map(option => (
-              <AutocompleteItem 
-                key={option.value} 
-                label={option.label} 
-                onSelect={(event: any) => {
-                  // Prevent the autocomplete's default behavior of closing the dropdown
-                  event.preventDefault(); 
+              <AutocompleteItem
+                key={option.value}
+                label={option.label}
+                // 1. Prevent input focus loss
+                onMouseDownCapture={(e: React.MouseEvent) => {
+                  e.preventDefault(); 
+                }}
+                // 2. Intercept click before the component closes the menu
+                onClickCapture={(e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   handleSelectOption(option);
+                }}
+                // 3. Intercept keyboard Enter/Space selection
+                onKeyDownCapture={(e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelectOption(option);
+                  }
                 }}
               >
                 {selectedValues.includes(option.value) && <Icon slot="end" name="status_check" />}
