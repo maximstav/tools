@@ -27,10 +27,17 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
         onInput={handleInput}
       >
         <AutocompleteList>
-          {/* Requirement 1: The 'initial' prop renders this group immediately on click/focus */}
           <AutocompleteGroup initial>
             {displayData.map(option => (
-              <AutocompleteItem key={option.value} label={option.label} onSelect={() => handleSelectOption(option)}>
+              <AutocompleteItem 
+                key={option.value} 
+                label={option.label} 
+                onSelect={(event: any) => {
+                  // Prevent the autocomplete's default behavior of closing the dropdown
+                  event.preventDefault(); 
+                  handleSelectOption(option);
+                }}
+              >
                 {selectedValues.includes(option.value) && <Icon slot="end" name="status_check" />}
               </AutocompleteItem>
             ))}
