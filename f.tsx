@@ -1,7 +1,6 @@
 import './multi-combobox-field.css';
-import { useId } from 'react'; // <-- Import useId
+import { useId, useRef, useEffect } from 'react';
 
-// Import Tooltip from your library
 import { Autocomplete, AutocompleteGroup, AutocompleteItem, AutocompleteList, Icon, Tooltip } from '@ds-components';
 
 import type { MultiComboboxFieldProps } from './use-multi-combobox-field';
@@ -14,24 +13,44 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
     selectedValues,
     displayData,
     computedPlaceholder,
-    allSelectedLabels, 
+    allSelectedLabels, // <-- Make sure this is exported from use-multi-combobox-field.ts!
     handleInput,
     handleSelectOption,
     handleKeyDownCapture,
   } = useMultiComboboxField(props);
 
-  // Generate a unique, DOM-safe ID for this specific component instance
-  const uniqueId = useId().replace(/:/g, ''); 
-  const triggerId = `combobox-wrapper-${uniqueId}`;
+  // 1. Unique ID for the Tooltip targeting
+  const uniqueId = useId().replace(/:/g, '');
+  const autocompleteId = `autocomplete-${uniqueId}`;
+
+  // 2. Ref to access the AutocompleteGroup's shadow root
+  const groupRef = useRef<HTMLElement>(null);
+
+  // 3. Effect to manually hide the empty label-container inside the shadow DOM
+  useEffect(() => {
+    // Wait for the component to mount and its shadow root to be created
+    const hideEmptyHeader = () => {
+      if (groupRef.current && groupRef.current.shadowRoot) {
+        const labelContainer = groupRef.current.shadowRoot.querySelector('#label-container');
+        if (labelContainer) {
+          (labelContainer as HTMLElement).style.display = 'none';
+        }
+      }
+    };
+
+    // Run it immediately, and also set a tiny timeout just in case 
+    // the web component takes an extra millisecond to paint its shadow DOM
+    hideEmptyHeader();
+    const timeout = setTimeout(hideEmptyHeader, 50);
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
   return (
     <>
-      <div 
-        id={triggerId} // <-- Attach the ID here
-        className="multi-combobox-field" 
-        onKeyDownCapture={handleKeyDownCapture}
-      >
+      <div className="multi-combobox-field" onKeyDownCapture={handleKeyDownCapture}>
         <Autocomplete
+          id={autocompleteId} // <-- Moved ID directly to the autocomplete component
           value={inputValue}
           placeholder={computedPlaceholder}
           clearable={clearable}
@@ -39,7 +58,10 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
           onInput={handleInput}
         >
           <AutocompleteList>
-            <AutocompleteGroup initial className="no-header-group">
+            <AutocompleteGroup 
+              ref={groupRef} // <-- Attached the ref here to access the shadow DOM
+              initial 
+            >
               {displayData.map(option => (
                 <AutocompleteItem
                   key={option.value}
@@ -68,9 +90,9 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
         </Autocomplete>
       </div>
 
-      {/* Render the library Tooltip only if more than 3 items are selected */}
+      {/* Tooltip will now attach to the Autocomplete element itself */}
       {selectedValues.length > 3 && (
-        <Tooltip for={triggerId} placement="bottom-start">
+        <Tooltip for={autocompleteId} placement="bottom-start">
           {allSelectedLabels}
         </Tooltip>
       )}
