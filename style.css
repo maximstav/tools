@@ -1,0 +1,20 @@
+/* Target the web component host directly */
+ds-autocomplete-group[initial] {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* Try targeting the label/header if they exposed it under a different part name */
+ds-autocomplete-group[initial]::part(label),
+ds-autocomplete-group[initial]::part(base) {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 0 !important;
+}
+
+/* Fallback for inner slotted content that might be generating the gap */
+ds-autocomplete-group[initial] > [slot="start"],
+ds-autocomplete-group[initial] > [slot="end"] {
+  display: none !important;
+}
