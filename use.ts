@@ -65,6 +65,17 @@ export const useMultiComboboxField = ({
     return `${selectedValues.length} selected`;
   }, [selectedValues, placeholder, data]);
 
+  const allSelectedLabels = useMemo(() => {
+    if (selectedValues.length === 0) return '';
+    
+    return selectedValues
+      .map(val => {
+        const option = data.find(opt => opt.value === val);
+        return option ? option.label : val;
+      })
+      .join(', ');
+  }, [selectedValues, data]);
+
   const setSelectedValues = (nextValues: string[]) => {
     onChange?.(nextValues.join(SEPARATOR));
     setInputValue('');
@@ -121,6 +132,7 @@ export const useMultiComboboxField = ({
     selectedValues,
     displayData,
     computedPlaceholder,
+    allSelectedLabels,
     handleInput,
     handleSelectOption,
     handleKeyDownCapture,
