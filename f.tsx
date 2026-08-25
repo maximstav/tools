@@ -3,7 +3,7 @@ import { useRef, useEffect, useId, useState } from 'react';
 
 import { Autocomplete, AutocompleteGroup, AutocompleteItem, AutocompleteList, Icon, Tooltip } from '@ds-components';
 
-import type { MultiComboboxFieldProps } from './use-multi-combobox-field';
+import type { MultiComboboxFieldProps, MultiComboboxFieldOption } from './use-multi-combobox-field';
 import { useMultiComboboxField } from './use-multi-combobox-field';
 
 export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
@@ -26,8 +26,7 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
   const groupRef = useRef<HTMLElement>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // This effect runs every time inputValue changes, ensuring the spacing fix 
-  // is applied to whichever group is currently rendered.
+  // --- Effects ---
   useEffect(() => {
     const hideEmptyHeader = () => {
       if (groupRef.current && groupRef.current.shadowRoot) {
@@ -40,51 +39,66 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
 
     hideEmptyHeader();
     const timeout = setTimeout(hideEmptyHeader, 50);
-    
     return () => clearTimeout(timeout);
   }, [inputValue]);
 
-  // Helper function to render items so we don't duplicate this large block of code
-  const renderItems = () => {
-    return displayData.map(option => (
+
+  // --- Event Handlers ---
+  const handleWrapperFocus = () => setIsDropdownOpen(true);
+
+  const handleWrapperBlur = (e: React.FocusEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDropdownOpen(false);
+    }
+  };
+
+  const handleWrapperKeyDown = (e: React.KeyboardEvent) => {
+    handleKeyDownCapture(e);
+    if (e.key === 'Escape') setIsDropdownOpen(false);
+  };
+
+  const handleClearClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleClear();
+  };
+
+  const handleItemClick = (e: React.MouseEvent, option: MultiComboboxFieldOption) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleSelectOption(option);
+  };
+
+  const handleItemKeyDown = (e: React.KeyboardEvent, option: MultiComboboxFieldOption) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSelectOption(option);
+    }
+  };
+
+
+  // --- Render Helpers ---
+  const renderItems = () =>
+    displayData.map((option) => (
       <AutocompleteItem
         key={option.value}
         label={option.label}
-        onMouseDownCapture={(e: React.MouseEvent) => {
-          e.preventDefault();
-        }}
-        onClickCapture={(e: React.MouseEvent) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleSelectOption(option);
-        }}
-        onKeyDownCapture={(e: React.KeyboardEvent) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSelectOption(option);
-          }
-        }}
+        onMouseDownCapture={(e: React.MouseEvent) => e.preventDefault()}
+        onClickCapture={(e: React.MouseEvent) => handleItemClick(e, option)}
+        onKeyDownCapture={(e: React.KeyboardEvent) => handleItemKeyDown(e, option)}
       >
         {selectedValues.includes(option.value) && <Icon slot="end" name="status_check" />}
       </AutocompleteItem>
     ));
-  };
 
   return (
     <>
       <div 
         className="multi-combobox-field" 
-        onKeyDownCapture={(e) => {
-          handleKeyDownCapture(e);
-          if (e.key === 'Escape') setIsDropdownOpen(false);
-        }}
-        onFocusCapture={() => setIsDropdownOpen(true)}
-        onBlurCapture={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            setIsDropdownOpen(false);
-          }
-        }}
+        onKeyDownCapture={handleWrapperKeyDown}
+        onFocusCapture={handleWrapperFocus}
+        onBlurCapture={handleWrapperBlur}
       >
         <Autocomplete
           id={autocompleteId} 
@@ -99,17 +113,12 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
             <Icon
               slot="end"
               name="close" 
-              onMouseDownCapture={(e: React.MouseEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleClear();
-              }}
-              style={{ cursor: 'pointer', zIndex: 10 }}
+              className="multi-combobox-clear-icon"
+              onMouseDownCapture={handleClearClick}
             />
           )}
 
           <AutocompleteList>
-            {/* THE FIX: Conditionally swap the entire group based on user input */}
             {!inputValue ? (
               <AutocompleteGroup ref={groupRef} initial>
                 {renderItems()}
@@ -125,12 +134,7 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
 
       {selectedValues.length > 3 && !isDropdownOpen && (
         <Tooltip for={autocompleteId} placement="bottom-start">
-          <div style={{ 
-            maxWidth: '300px', 
-            whiteSpace: 'normal', 
-            wordWrap: 'break-word',
-            textAlign: 'left'
-          }}>
+          <div className="multi-combobox-tooltip-content">
             {allSelectedLabels}
           </div>
         </Tooltip>
@@ -139,3 +143,21 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
   );
 };
 
+
+
+
+/* Existing shadow-root fixes (if you added any previously) */
+/* ... */
+
+/* New classes for cleaner JSX */
+.multi-combobox-clear-icon {
+  cursor: pointer;
+  z-index: 10;
+}
+
+.multi-combobox-tooltip-content {
+  max-width: 300px;
+  white-space: normal;
+  word-wrap: break-word;
+  text-align: left;
+}
