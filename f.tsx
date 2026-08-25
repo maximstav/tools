@@ -26,6 +26,8 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
   const groupRef = useRef<HTMLElement>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // This effect runs every time inputValue changes, ensuring the spacing fix 
+  // is applied to whichever group is currently rendered.
   useEffect(() => {
     const hideEmptyHeader = () => {
       if (groupRef.current && groupRef.current.shadowRoot) {
@@ -40,7 +42,34 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
     const timeout = setTimeout(hideEmptyHeader, 50);
     
     return () => clearTimeout(timeout);
-  }, [inputValue]); // <-- Added inputValue here so it re-runs if the group re-renders!
+  }, [inputValue]);
+
+  // Helper function to render items so we don't duplicate this large block of code
+  const renderItems = () => {
+    return displayData.map(option => (
+      <AutocompleteItem
+        key={option.value}
+        label={option.label}
+        onMouseDownCapture={(e: React.MouseEvent) => {
+          e.preventDefault();
+        }}
+        onClickCapture={(e: React.MouseEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSelectOption(option);
+        }}
+        onKeyDownCapture={(e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSelectOption(option);
+          }
+        }}
+      >
+        {selectedValues.includes(option.value) && <Icon slot="end" name="status_check" />}
+      </AutocompleteItem>
+    ));
+  };
 
   return (
     <>
@@ -80,36 +109,16 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
           )}
 
           <AutocompleteList>
-            <AutocompleteGroup 
-              ref={groupRef} 
-              // THE FIX: Only mark as initial if the user hasn't typed anything yet!
-              // We pass undefined when there is text so React completely removes the attribute.
-              initial={inputValue.length === 0 ? true : undefined}
-            >
-              {displayData.map(option => (
-                <AutocompleteItem
-                  key={option.value}
-                  label={option.label}
-                  onMouseDownCapture={(e: React.MouseEvent) => {
-                    e.preventDefault();
-                  }}
-                  onClickCapture={(e: React.MouseEvent) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSelectOption(option);
-                  }}
-                  onKeyDownCapture={(e: React.KeyboardEvent) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleSelectOption(option);
-                    }
-                  }}
-                >
-                  {selectedValues.includes(option.value) && <Icon slot="end" name="status_check" />}
-                </AutocompleteItem>
-              ))}
-            </AutocompleteGroup>
+            {/* THE FIX: Conditionally swap the entire group based on user input */}
+            {!inputValue ? (
+              <AutocompleteGroup ref={groupRef} initial>
+                {renderItems()}
+              </AutocompleteGroup>
+            ) : (
+              <AutocompleteGroup ref={groupRef}>
+                {renderItems()}
+              </AutocompleteGroup>
+            )}
           </AutocompleteList>
         </Autocomplete>
       </div>
@@ -129,3 +138,4 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
     </>
   );
 };
+
