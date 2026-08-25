@@ -42,7 +42,6 @@ export const useMultiComboboxField = ({
 
     const allOptions = [...data, ...customOptions];
 
-    // Group items to satisfy Requirement 3: selected items appear at the top
     const selectedOptions = allOptions.filter(opt => selectedValues.includes(opt.value));
     const unselectedOptions = allOptions.filter(opt => !selectedValues.includes(opt.value));
 
@@ -52,12 +51,11 @@ export const useMultiComboboxField = ({
   const computedPlaceholder = useMemo(() => {
     if (selectedValues.length === 0) return placeholder;
 
-    // Requirement 2: Show actual selected labels for 3 or fewer items
     if (selectedValues.length <= 3) {
       return selectedValues
         .map(val => {
           const option = data.find(opt => opt.value === val);
-          return option ? option.label : val; // Fallback to raw value for custom options
+          return option ? option.label : val; 
         })
         .join(', ');
     }
@@ -65,6 +63,7 @@ export const useMultiComboboxField = ({
     return `${selectedValues.length} selected`;
   }, [selectedValues, placeholder, data]);
 
+  // NEW: Generate the comma-separated string for the Tooltip
   const allSelectedLabels = useMemo(() => {
     if (selectedValues.length === 0) return '';
     
@@ -127,14 +126,20 @@ export const useMultiComboboxField = ({
     addValue(inputValue);
   };
 
+  const handleClear = () => {
+    setSelectedValues([]);
+    setInputValue('');
+  };
+
   return {
     inputValue,
     selectedValues,
     displayData,
     computedPlaceholder,
-    allSelectedLabels,
+    allSelectedLabels, // <-- Exported here
     handleInput,
     handleSelectOption,
     handleKeyDownCapture,
+    handleClear,
   };
 };
