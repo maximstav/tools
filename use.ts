@@ -41,12 +41,34 @@ export const useMultiComboboxField = ({
       .map(selectedValue => ({ label: selectedValue, value: selectedValue }));
 
     const allOptions = [...data, ...customOptions];
+    const lowerInput = inputValue.toLowerCase().trim();
 
-    const selectedOptions = allOptions.filter(opt => selectedValues.includes(opt.value));
-    const unselectedOptions = allOptions.filter(opt => !selectedValues.includes(opt.value));
+    // If the user hasn't typed anything, just sort by Selected -> Unselected
+    if (!lowerInput) {
+      const selectedOptions = allOptions.filter(opt => selectedValues.includes(opt.value));
+      const unselectedOptions = allOptions.filter(opt => !selectedValues.includes(opt.value));
+      return [...selectedOptions, ...unselectedOptions];
+    }
 
-    return [...selectedOptions, ...unselectedOptions];
-  }, [data, selectedValues]);
+    // NEW: If the user IS typing, sort matches to the top
+    const matchedSelected: MultiComboboxFieldOption[] = [];
+    const matchedUnselected: MultiComboboxFieldOption[] = [];
+    const unmatchedSelected: MultiComboboxFieldOption[] = [];
+    const unmatchedUnselected: MultiComboboxFieldOption[] = [];
+
+    allOptions.forEach(opt => {
+      const isMatch = opt.label.toLowerCase().includes(lowerInput);
+      const isSelected = selectedValues.includes(opt.value);
+
+      if (isMatch && isSelected) matchedSelected.push(opt);
+      else if (isMatch && !isSelected) matchedUnselected.push(opt);
+      else if (!isMatch && isSelected) unmatchedSelected.push(opt);
+      else unmatchedUnselected.push(opt);
+    });
+
+    // Order: Matched (selected first), then Unmatched (selected first)
+    return [...matchedSelected, ...matchedUnselected, ...unmatchedSelected, ...unmatchedUnselected];
+  }, [data, selectedValues, inputValue]); // <-- Added inputValue to dependencies
 
   const computedPlaceholder = useMemo(() => {
     if (selectedValues.length === 0) return placeholder;
@@ -63,7 +85,6 @@ export const useMultiComboboxField = ({
     return `${selectedValues.length} selected`;
   }, [selectedValues, placeholder, data]);
 
-  // NEW: Generate the comma-separated string for the Tooltip
   const allSelectedLabels = useMemo(() => {
     if (selectedValues.length === 0) return '';
     
@@ -136,7 +157,7 @@ export const useMultiComboboxField = ({
     selectedValues,
     displayData,
     computedPlaceholder,
-    allSelectedLabels, // <-- Exported here
+    allSelectedLabels,
     handleInput,
     handleSelectOption,
     handleKeyDownCapture,
