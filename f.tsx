@@ -1,5 +1,5 @@
 import './multi-combobox-field.css';
-import { useRef, useEffect, useId, useState } from 'react'; // <-- Added useState
+import { useRef, useEffect, useId, useState } from 'react';
 
 import { Autocomplete, AutocompleteGroup, AutocompleteItem, AutocompleteList, Icon, Tooltip } from '@ds-components';
 
@@ -24,8 +24,6 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
   const autocompleteId = `autocomplete-${uniqueId}`;
 
   const groupRef = useRef<HTMLElement>(null);
-  
-  // NEW: Track if the dropdown is currently open (focused)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -42,7 +40,7 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
     const timeout = setTimeout(hideEmptyHeader, 50);
     
     return () => clearTimeout(timeout);
-  }, []);
+  }, [inputValue]); // <-- Added inputValue here so it re-runs if the group re-renders!
 
   return (
     <>
@@ -50,13 +48,10 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
         className="multi-combobox-field" 
         onKeyDownCapture={(e) => {
           handleKeyDownCapture(e);
-          // Optional: Close state if they press Escape to dismiss the menu
           if (e.key === 'Escape') setIsDropdownOpen(false);
         }}
-        // Track focus to hide the tooltip when the user is actively interacting
         onFocusCapture={() => setIsDropdownOpen(true)}
         onBlurCapture={(e) => {
-          // Only close if they are actually clicking outside of the component entirely
           if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setIsDropdownOpen(false);
           }
@@ -87,7 +82,9 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
           <AutocompleteList>
             <AutocompleteGroup 
               ref={groupRef} 
-              initial 
+              // THE FIX: Only mark as initial if the user hasn't typed anything yet!
+              // We pass undefined when there is text so React completely removes the attribute.
+              initial={inputValue.length === 0 ? true : undefined}
             >
               {displayData.map(option => (
                 <AutocompleteItem
@@ -117,10 +114,8 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
         </Autocomplete>
       </div>
 
-      {/* Conditionally hide the tooltip if the dropdown is open */}
       {selectedValues.length > 3 && !isDropdownOpen && (
         <Tooltip for={autocompleteId} placement="bottom-start">
-          {/* Wrapper to force the tooltip text to span multiple lines */}
           <div style={{ 
             maxWidth: '300px', 
             whiteSpace: 'normal', 
