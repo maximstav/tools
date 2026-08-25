@@ -1,7 +1,6 @@
 import './multi-combobox-field.css';
-import { useRef, useEffect, useId } from 'react'; // <-- Added useId
+import { useRef, useEffect, useId, useState } from 'react'; // <-- Added useState
 
-// Added Tooltip to imports
 import { Autocomplete, AutocompleteGroup, AutocompleteItem, AutocompleteList, Icon, Tooltip } from '@ds-components';
 
 import type { MultiComboboxFieldProps } from './use-multi-combobox-field';
@@ -14,18 +13,20 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
     selectedValues,
     displayData,
     computedPlaceholder,
-    allSelectedLabels, // <-- Extracted here
+    allSelectedLabels,
     handleInput,
     handleSelectOption,
     handleKeyDownCapture,
     handleClear,
   } = useMultiComboboxField(props);
 
-  // 1. Generate unique ID for the tooltip to target
   const uniqueId = useId().replace(/:/g, '');
   const autocompleteId = `autocomplete-${uniqueId}`;
 
   const groupRef = useRef<HTMLElement>(null);
+  
+  // NEW: Track if the dropdown is currently open (focused)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const hideEmptyHeader = () => {
@@ -45,9 +46,24 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
 
   return (
     <>
-      <div className="multi-combobox-field" onKeyDownCapture={handleKeyDownCapture}>
+      <div 
+        className="multi-combobox-field" 
+        onKeyDownCapture={(e) => {
+          handleKeyDownCapture(e);
+          // Optional: Close state if they press Escape to dismiss the menu
+          if (e.key === 'Escape') setIsDropdownOpen(false);
+        }}
+        // Track focus to hide the tooltip when the user is actively interacting
+        onFocusCapture={() => setIsDropdownOpen(true)}
+        onBlurCapture={(e) => {
+          // Only close if they are actually clicking outside of the component entirely
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setIsDropdownOpen(false);
+          }
+        }}
+      >
         <Autocomplete
-          id={autocompleteId} // <-- 2. Attach ID here
+          id={autocompleteId} 
           value={inputValue}
           placeholder={computedPlaceholder}
           clearable={clearable}
@@ -101,10 +117,18 @@ export const MultiComboboxField = (props: MultiComboboxFieldProps) => {
         </Autocomplete>
       </div>
 
-      {/* 3. Show Tooltip if more than 3 items are selected */}
-      {selectedValues.length > 3 && (
+      {/* Conditionally hide the tooltip if the dropdown is open */}
+      {selectedValues.length > 3 && !isDropdownOpen && (
         <Tooltip for={autocompleteId} placement="bottom-start">
-          {allSelectedLabels}
+          {/* Wrapper to force the tooltip text to span multiple lines */}
+          <div style={{ 
+            maxWidth: '300px', 
+            whiteSpace: 'normal', 
+            wordWrap: 'break-word',
+            textAlign: 'left'
+          }}>
+            {allSelectedLabels}
+          </div>
         </Tooltip>
       )}
     </>
