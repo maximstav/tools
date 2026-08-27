@@ -1,26 +1,213 @@
-Here is a clear, professional task description you can copy and paste directly into your issue board (like Jira, GitHub Issues, or Trello). It covers all the architectural changes and security updates we discussed.
+package com.lseg.supportportal.backend.core.search.deserializer;
 
-### Title: Configure Multiple DB Connection Pools (HikariCP) & Secure Credentials
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.lseg.supportportal.backend.core.search.domain.DateRangeValue;
+import com.lseg.supportportal.backend.core.search.domain.NumericRangeValue;
+import com.lseg.supportportal.backend.core.search.domain.SearchCriteria;
+import com.lseg.supportportal.backend.core.search.domain.SearchOperator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-**Background**
-Currently, our Spring Boot backend connects to a single database with credentials hardcoded in the `application.properties` file. We need to prepare our architecture to support three physically distinct databases. This requires moving away from Spring's default auto-configuration to manually configure three HikariCP connection pools, while simultaneously securing our database credentials via environment variables.
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 
-**Acceptance Criteria**
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-* **Secure Secrets:** Hardcoded usernames and passwords must be removed from `application.properties` and replaced with environment variable placeholders (e.g., `${DB1_USERNAME}`).
-* **Local Environment Setup:** Implement a `.env` file for local development and ensure it is immediately added to `.gitignore`.
-* **HikariCP Configuration:** Define unique properties for three databases (`db1`, `db2`, `db3`) in `application.properties`, including JDBC URLs and tuned Hikari settings (e.g., `maximum-pool-size=10`).
-* **Package Restructuring:** Organize existing and future Entity and Repository classes into dedicated database-specific folders (e.g., `com.app.db1`, `com.app.db2`).
-* **Java Configuration:** Create three distinct `@Configuration` classes (`Db1Config`, `Db2Config`, `Db3Config`) to explicitly define the `DataSource`, `EntityManagerFactory`, and `TransactionManager` for each database.
-* **Primary Designation:** Ensure Database 1's configuration beans are annotated with `@Primary` so Spring knows which connection to use by default.
+class SearchCriteriaDeserializerTest {
 
-**Technical Notes**
+    private ObjectMapper objectMapper;
 
-* **Stack:** Spring Boot, Spring Data JPA, HikariCP, Gradle.
-* **Security check:** Verify that no `.env` files or credentials are accidentally committed during the Pull Request review.
+    @BeforeEach
+    void setUp() {
+        objectMapper = new ObjectMapper();
+        // Required to deserialize LocalDate instances in the payload records
+        objectMapper.registerModule(new JavaTimeModule()); 
+    }
 
----
+    @Test
+    void shouldDeserializeEqualOperator() throws JsonProcessingException {
+        // Given
+        String json = """
+            {
+                "key": "name",
+                "operator": "EQUAL",
+                "value": "John Doe"
+            }
+            """;
 
-This structure makes it incredibly clear to any developer (or future you!) exactly what needs to be done, why it matters, and how to verify it is complete.
+        // When
+        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
 
-Which project management tool are you using to track this project?
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.key()).isEqualTo("name");
+        assertThat(result.operator()).isEqualTo(SearchOperator.EQUAL);
+        assertThat(result.value()).isEqualTo("John Doe");
+    }
+
+    @Test
+    void shouldDeserializeNumericBetweenOperator() throws JsonProcessingException {
+        // Given
+        String json = """
+            {
+                "key": "price",
+                "operator": "BETWEEN",
+                "value": {
+                    "from": 10.5,
+                    "to": 50.75
+                }
+            }
+            """;
+
+        // When
+        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
+
+        // Then
+        assertThat(result.key()).isEqualTo("price");
+        assertThat(result.operator()).isEqualTo(SearchOperator.BETWEEN);
+        assertThat(result.value()).isInstanceOf(NumericRangeValue.class);
+
+        NumericRangeValue numericRange = (NumericRangeValue) result.value();
+        assertThat(numericRange.fromInclusive()).isEqualTo(new BigDecimal("10.5"));
+        assertThat(numericRange.toInclusive()).isEqualTo(new BigDecimal("50.75"));
+    }
+
+    @Test
+    void shouldDeserializeDateBetweenOperator() throws JsonProcessingException {
+        // Given
+        String json = """
+            {
+                "key": "createdDate",
+                "operator": "BETWEEN",
+                "value": {
+                    "from": "2023-10-01",
+                    "to": "2023-10-15"
+                }
+            }
+            """;
+
+        // When
+        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
+
+        // Then
+        assertThat(result.key()).isEqualTo("createdDate");
+        assertThat(result.operator()).isEqualTo(SearchOperator.BETWEEN);
+        assertThat(result.value()).isInstanceOf(DateRangeValue.class);
+
+        DateRangeValue dateRange = (DateRangeValue) result.value();
+        assertThat(dateRange.fromInclusive()).isEqualTo(LocalDateTime.of(2023, 10, 1, 0, 0));
+        // Verify that 'to' date was shifted to the next day's start time as per deserializer logic
+        assertThat(dateRange.toExclusive()).isEqualTo(LocalDateTime.of(2023, 10, 16, 0, 0)); 
+    }
+
+    @Test
+    void shouldThrowWhenBetweenOperatorMissesFromOrTo() {
+        // Given
+        String jsonMissesTo = """
+            {
+                "key": "price",
+                "operator": "BETWEEN",
+                "value": {
+                    "from": 10.5
+                }
+            }
+            """;
+
+        // When & Then
+        assertThatThrownBy(() -> objectMapper.readValue(jsonMissesTo, SearchCriteria.class))
+                .isInstanceOf(JsonMappingException.class)
+                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
+                .hasMessageContaining("BETWEEN operator requires both 'from' and 'to' values");
+    }
+    
+    @Test
+    void shouldThrowWhenDateBetweenOperatorHasNullDates() {
+        // Given
+        String jsonNullDates = """
+            {
+                "key": "date",
+                "operator": "BETWEEN",
+                "value": {
+                    "from": null,
+                    "to": null
+                }
+            }
+            """;
+
+        // When & Then
+        assertThatThrownBy(() -> objectMapper.readValue(jsonNullDates, SearchCriteria.class))
+                .isInstanceOf(JsonMappingException.class)
+                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
+                .hasMessageContaining("BETWEEN operator requires both 'from' and 'to' values");
+    }
+
+    @Test
+    void shouldDeserializeInOperator() throws JsonProcessingException {
+        // Given
+        String json = """
+            {
+                "key": "status",
+                "operator": "IN",
+                "value": {
+                    "values": ["ACTIVE", "PENDING", "RESOLVED"]
+                }
+            }
+            """;
+
+        // When
+        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
+
+        // Then
+        assertThat(result.key()).isEqualTo("status");
+        assertThat(result.operator()).isEqualTo(SearchOperator.IN);
+        
+        @SuppressWarnings("unchecked")
+        List<String> values = (List<String>) result.value();
+        assertThat(values).containsExactly("ACTIVE", "PENDING", "RESOLVED");
+    }
+
+    @Test
+    void shouldThrowWhenInOperatorMissesValuesArray() {
+        // Given
+        String jsonMissingValues = """
+            {
+                "key": "status",
+                "operator": "IN",
+                "value": {
+                    "wrongKey": ["ACTIVE"]
+                }
+            }
+            """;
+
+        // When & Then
+        assertThatThrownBy(() -> objectMapper.readValue(jsonMissingValues, SearchCriteria.class))
+                .isInstanceOf(JsonMappingException.class)
+                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
+                .hasMessageContaining("IN operator requires a 'values' array");
+    }
+
+    @Test
+    void shouldThrowWhenInOperatorValuesArrayIsEmpty() {
+        // Given
+        String jsonEmptyValues = """
+            {
+                "key": "status",
+                "operator": "IN",
+                "value": {
+                    "values": []
+                }
+            }
+            """;
+
+        // When & Then
+        assertThatThrownBy(() -> objectMapper.readValue(jsonEmptyValues, SearchCriteria.class))
+                .isInstanceOf(JsonMappingException.class)
+                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
+                .hasMessageContaining("IN operator requires at least one selected value");
+    }
+}
