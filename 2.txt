@@ -1,202 +1,151 @@
-package com.yourname.p2pchat.core;
+# LSEG Internship Closing Presentation: Outline & Script
 
-import com.yourname.p2pchat.domain.Message;
-import com.yourname.p2pchat.domain.MessageType;
-import com.yourname.p2pchat.ui.ChatUI;
-import com.yourname.p2pchat.util.JsonUtil;
-import org.java_websocket.WebSocket;
+This document provides a slide-by-slide structure, suggested text for your slides (keep this brief!), and detailed speaker notes to guide what you actually say during the presentation.
 
-import java.net.URI;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+---
 
-public class ChatSessionManager {
-private final String myId;
-private final ChatUI ui;
-private GroupManager groupManager; // From our previous mesh implementation
+## Slide 1: Introduction
+**Slide Visuals:** LSEG Logo, a professional photo of yourself, or a clean title graphic.
+**Slide Text:**
+*   **Name:** [Your Name]
+*   **Division/Sub-team:** Software Engineering Intern - [Insert Division/Sub-team]
+*   **Location:** Cluj-Napoca
+*   **Programme Year:** 2026
 
-// Track pending connections by the WebSocket object itself, mapping to its direction
-private final Map<WebSocket, ConnectionDirection> pendingConnections = new ConcurrentHashMap<>();
+**Speaker Notes (What to say):**
+"Hi everyone, my name is [Your Name], and I'm thrilled to share my journey as a Software Engineering Intern here in Cluj-Napoca over the past 9 weeks. It’s been an incredible transition from intensive learning to hands-on execution alongside an amazing team."
 
-// Fully established connections mapped by the peer's username
-private final Map<String, WebSocket> activeChats = new ConcurrentHashMap<>();
+---
 
-// Reverse lookup map to easily clean up when a WebSocket drops unexpectedly
-private final Map<WebSocket, String> socketToPeerId = new ConcurrentHashMap<>();
+## Slide 2: Goals & Expectations
+**Slide Visuals:** A simple numbered list or icons representing growth, tech, and networking.
+**Slide Text:**
+*   Master professional Java development & best practices
+*   Understand business logic & system architecture
+*   Demonstrate independent execution with great collaboration
+*   Build a strong professional network
+*   Secure a permanent engineering role
 
-public ChatSessionManager(String myId, ChatUI ui) {
-this.myId = myId;
-this.ui = ui;
-}
+**Speaker Notes:**
+"When I started this internship, I set five clear objectives for myself. I wanted to master Java and best practices, truly understand the business logic behind our architecture, and prove that I could execute tasks independently while collaborating well. Ultimately, my goal was to build a strong network here and prove that I am ready for a permanent engineering role at LSEG."
 
-public void setGroupManager(GroupManager groupManager) {
-this.groupManager = groupManager;
-}
+---
 
-// --- CONNECTION HANDLING ---
+## Slide 3: The Foundation (Training)
+**Slide Visuals:** Maybe a graphic showing a timeline starting with "Training" and moving to "Execution". 
+**Slide Text:**
+*   Intensive Java Training (First few weeks)
+*   Bridging the gap between theory and enterprise scale
+*   Applying strict mentorship standards to real-world code
 
-/**
-* Called by ChatServer when someone connects to our listening port.
-*/
-public void onInboundConnection(WebSocket conn) {
-// We set it as INBOUND, meaning we sit back and wait for them to send an INIT
-pendingConnections.put(conn, ConnectionDirection.INBOUND);
-}
+**Speaker Notes:**
+"The first few weeks were dedicated to intensive Java training. This was crucial for me. It wasn't just about learning the language, but understanding how to write reliable, scalable code that meets LSEG's high standards. I made it a personal goal to take everything our mentors taught us during this phase and apply it directly to our final project."
 
-/**
-* Called by the UI to initiate a connection.
-*/
-public void connectToPeer(String ip, int port) {
-try {
-URI uri = new URI("ws://" + ip + ":" + port);
+---
 
-// Create the client and define the onOpen behavior inline
-ChatClient client = new ChatClient(uri, this) {
-@Override
-public void onOpen(org.java_websocket.handshake.ServerHandshake handshakedata) {
-// When the TCP connection succeeds, register it as OUTBOUND
-pendingConnections.put(this, ConnectionDirection.OUTBOUND);
+## Slide 4: The Final Project - Overview
+**Slide Visuals:** High-level architecture diagram or logos of the tech stack (Spring Boot, React, TypeScript, Microsoft Entra).
+**Slide Text:**
+*   **The Problem:** Support team needed streamlined access to a database of orders, executions, and audits.
+*   **The Solution:** A robust, full-stack internal platform.
+*   **Tech Stack:** Spring Boot (Backend) & React TypeScript (Frontend)
+*   **My Role:** Full-stack involvement from initial architecture to final decisions.
 
-// Since we initiated, WE must send the INIT message first
-Message initMsg = new Message(MessageType.INIT, myId, "Requesting connection");
-this.send(JsonUtil.serialize(initMsg));
-}
-};
+**Speaker Notes:**
+"For our core project, our team of five interns built a platform for the support team, giving them easy access to a database of orders, executions, and audits. We used Spring Boot for the backend and React with TypeScript for the frontend. What I loved most about this project was being involved from day one—helping shape the architecture and making key design decisions along the way."
 
-client.connect(); // This runs asynchronously in the background
-} catch (Exception e) {
-ui.displayError("Invalid connection address.");
-}
-}
+---
 
-// --- MESSAGE ROUTING ---
+## Slide 5: Key Technical Contributions
+**Slide Visuals:** *[Insert your screenshots of the search panel and display filters here]*
+**Slide Text:**
+*   **Backend:** Implemented search repository with server-side hard limits & Hikari database connection pool.
+*   **Frontend:** Built the display filters and search panel (see screenshot).
+*   **Full-Stack Flexibility:** Took over backend implementation for multiple selection/numeric range filters.
+*   **AI Integration:** Finalized backend thread logic for the AI chat.
 
-/**
-* Called by both ChatServer and ChatClient whenever a string is received.
-*/
-public void onMessageReceived(WebSocket conn, String jsonMessage) {
-Message message = JsonUtil.deserialize(jsonMessage);
+**Speaker Notes:**
+"I got my hands dirty across the entire stack. On the backend, I implemented a search repository with a server-side hard limit and utilized a Hikari database connection pool for performance. On the frontend, my biggest task was building out the display filters and search panel, which you can see in the screenshots here. I also found myself bridging the gap—for example, I was assigned the frontend for the numeric range filters, but ended up taking over the backend task for it as well to ensure seamless integration. Finally, I helped wrap up the last steps of the AI chat thread logic on the backend."
 
-if (message == null) {
-System.err.println("[System] Received malformed JSON. Dropping connection.");
-conn.close();
-return;
-}
+---
 
-// If this socket is still in the pending map, route it to the handshake logic
-if (pendingConnections.containsKey(conn)) {
-processHandshake(conn, message);
-} else {
-// It's an established connection. Route normally based on type.
-switch (message.getType()) {
-case MSG:
-ui.onMessageReceived(message);
-break;
-case GROUP_INVITE:
-if (groupManager != null) groupManager.handleGroupInvite(message);
-break;
-case GROUP_MSG:
-if (groupManager != null) groupManager.handleIncomingGroupMessage(message);
-break;
-case CLOSE:
-handleGracefulClose(conn, message);
-break;
-default:
-break;
-}
-}
-}
+## Slide 6: Challenges & Collaboration
+**Slide Visuals:** Icons representing teamwork and problem-solving (or a picture of you working with a teammate).
+**Slide Text:**
+*   **Challenge:** Seamless Microsoft Entra Login integration.
+*   **Solution:** Hand-in-hand collaboration between Frontend and Backend.
+*   **Result:** Smooth, secure authentication.
 
-// --- PROTOCOL HANDSHAKE ---
+**Speaker Notes:**
+"One of the more complex challenges was implementing login with Microsoft Entra. Because this required perfect synchronization between the client and the server, I worked hand-in-hand with my teammate on the frontend. We sat down, debugged together, and didn't stop until both sides were communicating perfectly. It taught me exactly when to push through a problem independently and when to lean on my team."
 
-private void processHandshake(WebSocket conn, Message message) {
-ConnectionDirection direction = pendingConnections.remove(conn);
-String peerId = message.getSenderId();
+---
 
-if (direction == ConnectionDirection.INBOUND && message.getType() == MessageType.INIT) {
-// They initiated. We received INIT. We must reply with ACK.
-registerActiveConnection(peerId, conn);
+## Slide 7: The Hackathon Experience
+**Slide Visuals:** *[Insert Hackathon photos here]*
+**Slide Text:**
+*   2-3 days of intense, focused development.
+*   Fast-paced collaboration and ideation.
+*   Successfully delivered a working MVP.
 
-Message ack = new Message(MessageType.ACK, myId, "Connection Accepted");
-conn.send(JsonUtil.serialize(ack));
-ui.displaySystemMessage("Connection established with " + peerId);
+**Speaker Notes:**
+"Beyond the main project, the hackathon was an absolute highlight. We had just 2 to 3 days to ideate and build an MVP. It was incredibly fast-paced, but it was amazing to see how well our intern team naturally collaborated under pressure to deliver a working product in such a short time."
 
-} else if (direction == ConnectionDirection.OUTBOUND && message.getType() == MessageType.ACK) {
-// We initiated. We received their ACK.
-registerActiveConnection(peerId, conn);
-ui.displaySystemMessage("Successfully connected to " + peerId);
+---
 
-} else {
-// PROTOCOL VIOLATION! (e.g., received MSG before INIT, or ACK when expecting INIT)
-ui.displayError("Protocol violation from peer. Dropping connection.");
-conn.close();
-}
-}
+## Slide 8: Life at LSEG Cluj & Networking
+**Slide Visuals:** *[Insert photos from drinks, the summer party, and group intern photos]*
+**Slide Text:**
+*   A welcoming, open culture.
+*   Building bonds: Coffee chats, pizza runs, and local restaurants.
+*   LSEG Summer Party celebrations.
 
-private void registerActiveConnection(String peerId, WebSocket conn) {
-activeChats.put(peerId, conn);
-socketToPeerId.put(conn, peerId);
-}
+**Speaker Notes:**
+"The culture in the Cluj office is fantastic. The five of us interns became really close. Everyone here is so welcoming; it was incredibly easy to make friends, ask questions, and get help. Whether we were hanging out by the coffee machine, going out for pizza, or celebrating at the company summer party, I really felt like I was part of the community."
 
-// --- SENDING DATA ---
+---
 
-public boolean isConnected(String peerId) {
-return activeChats.containsKey(peerId);
-}
+## Slide 9: Alignment with LSEG Values (The "How")
+**Slide Visuals:** The 4 LSEG Values (Partnership, Excellence, Change, Integrity).
+**Slide Text:**
+*   **Partnership:** Close collaboration with mentors and fellow interns.
+*   **Excellence:** Delivering reliable, high-performing code on strict timelines.
+*   **Change:** Embedding best practices into a scalable architecture.
+*   **Integrity:** Accountability, testing code, and meeting LSEG standards.
 
-public void sendChatMessage(String peerId, String payload) {
-Message msg = new Message(MessageType.MSG, myId, payload);
-sendRawMessage(peerId, msg);
-}
+**Speaker Notes:**
+"Throughout the 9 weeks, I tried to align my work with LSEG’s core values. **Partnership** came naturally through our open culture, especially during the hackathon and Entra integration. To me, **Excellence** meant delivering reliable code on time, using the standards our mentors taught us. I drove **Change** by pushing myself into complex technical areas rather than sticking to simple tasks, ensuring our architecture was scalable. And I maintained **Integrity** by holding myself accountable for the security and quality of my code."
 
-/**
-* Used by GroupManager to send GROUP_MSG and GROUP_INVITE objects.
-*/
-public boolean sendRawMessage(String peerId, Message message) {
-WebSocket conn = activeChats.get(peerId);
-if (conn != null && conn.isOpen()) {
-conn.send(JsonUtil.serialize(message));
-return true;
-}
-return false;
-}
+---
 
-// --- DISCONNECT HANDLING ---
+## Slide 10: Key Learnings & Looking Forward
+**Slide Visuals:** A summary icon or a forward-looking arrow.
+**Slide Text:**
+*   Mastered enterprise Java and full-stack integration.
+*   Developed a deep sense of technical ownership.
+*   Ready to transition to a permanent engineering role.
 
-private void handleGracefulClose(WebSocket conn, Message message) {
-ui.displaySystemMessage(message.getSenderId() + " left the chat.");
-conn.close(); // Close our end of the WebSocket
-}
+**Speaker Notes:**
+"Looking back, I’ve achieved what I set out to do. I’ve grown from an intense training phase to executing complex, full-stack features. I’ve learned how business logic is shaped by the need for reliability and scale. These results have truly solidified my desire to stay here and secure a permanent engineering role with LSEG."
 
-/**
-* Called by Server/Client when the WebSocket physical connection drops.
-*/
-public void onConnectionClosed(WebSocket conn) {
-pendingConnections.remove(conn);
+---
 
-String peerId = socketToPeerId.remove(conn);
-if (peerId != null) {
-activeChats.remove(peerId);
-ui.onPeerDisconnected(peerId, "Connection lost");
+## Slide 11: Acknowledgements & Thank Yous
+**Slide Visuals:** A "Thank You" graphic.
+**Slide Text:**
+*   Special thanks to my Mentors, People Leader, and the Cluj Engineering Team.
+*   Shoutout to my fellow interns!
 
-if (groupManager != null) {
-groupManager.handlePeerDisconnect(peerId);
-}
-}
-}
+**Speaker Notes:**
+"Before I wrap up, I want to say a massive thank you. To my mentors and my people leader—thank you for your guidance from day one. To the wider team here in Cluj for answering my questions and making me feel welcome. And to my fellow interns, thank you for making these past 9 weeks so much fun. I couldn't have asked for a better experience."
 
-public void shutdownAll() {
-System.out.println("[System] Shutting down all chats...");
-Message closeMsg = new Message(MessageType.CLOSE, myId, "Going offline");
-String closeJson = JsonUtil.serialize(closeMsg);
+---
 
-for (WebSocket conn : activeChats.values()) {
-if (conn.isOpen()) {
-conn.send(closeJson);
-conn.close();
-}
-}
-activeChats.clear();
-socketToPeerId.clear();
-}
-}
+## Slide 12: Q&A
+**Slide Visuals:** Simple "Questions?" text.
+**Slide Text:** 
+*   Open for questions!
+
+**Speaker Notes:**
+"Thank you all for listening. I’d be happy to answer any questions you might have about the project or my experience."
+```eof
