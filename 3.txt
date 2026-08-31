@@ -1,203 +1,166 @@
-dependencies {
-// Jakarta WebSocket API
-implementation 'jakarta.websocket:jakarta.websocket-api:2.1.1'
+# LSEG Internship Presentation: Expanded & Personal Script
 
-// Tyrus implementation (Standalone Grizzly server & client)
-implementation 'org.glassfish.tyrus:tyrus-server:2.1.3'
-implementation 'org.glassfish.tyrus:tyrus-container-grizzly-server:2.1.3'
-implementation 'org.glassfish.tyrus:tyrus-client:2.1.3'
-implementation 'org.glassfish.tyrus:tyrus-container-grizzly-client:2.1.3'
+## Slide 1: Introduction
+**Visuals:** LSEG Logo, a professional but friendly photo of yourself, and the title.
+**Slide Text:**
+*   **Name:** [Your Name]
+*   **Role:** Software Engineering Intern 
+*   **Location:** Cluj-Napoca, 2026
 
-// Gson for JSON
-implementation 'com.google.code.gson:gson:2.10.1'
-}
+**Speaker Notes:**
+"Hi everyone, my name is [Your Name], and I’m a Software Engineering Intern here in the Cluj office. Over the past 9 weeks, I’ve had the chance to transition from intense Java training to building real, impactful software. Today, I don’t just want to show you the code I wrote, but share the actual story of my time here—the challenges, the wins, and the people who made it great."
 
-//≈===============÷÷======
+---
 
-package com.yourname.p2pchat.network;
+## Slide 2: Day 1 vs. Week 9 (Setting the Stage)
+**Visuals:** Maybe a split-screen icon (Nervous face vs. Confident face) or a photo from your first week.
+**Slide Text:**
+*   **The Dream:** Meeting Tudor Fracas at a job fair years ago.
+*   **The Fear:** Meeting "The Bosses."
+*   **The Reality:** An incredibly open and welcoming culture.
 
-import com.yourname.p2pchat.core.ChatSessionManager;
-import jakarta.websocket.*;
-import jakarta.websocket.server.ServerEndpoint;
-import jakarta.websocket.server.ServerEndpointConfig;
+**Speaker Notes:**
+"To give you some context on what this internship means to me, I actually spoke to Tudor Fracas at a job fair a couple of years ago. He told me how competitive this position was, and that conversation became a real inspiration for me to push for this role. So, coming into Day 1, I was thrilled, but honestly, I was a bit nervous about meeting 'the bosses' and the senior leadership. But what I found was completely the opposite—everyone was incredibly nice, approachable, and truly invested in our growth."
 
-// The endpoint URL peers will connect to
-@ServerEndpoint(value = "/chat", configurator = ChatServerEndpoint.EndpointConfigurator.class)
-public class ChatServerEndpoint {
+---
 
-private final ChatSessionManager sessionManager;
+## Slide 3: The Training Phase & The "Aha" Moment
+**Visuals:** A Java logo and an icon representing gears/threads.
+**Slide Text:**
+*   Bridging the gap between university and enterprise.
+*   **The Highlight:** Threads and Concurrency.
+*   Hardest part = Most rewarding part.
 
-// Injected via the Configurator
-public ChatServerEndpoint(ChatSessionManager sessionManager) {
-this.sessionManager = sessionManager;
-}
+**Speaker Notes:**
+"The first few weeks were dedicated to intensive Java training. It was a big step up from university coding. We learned how to write reliable, scalable code that meets LSEG's high standards. For me, the most fascinating—and arguably the hardest—part of the training was learning about threads and concurrency. It was tough to wrap my head around at first, but it became my favorite topic and ended up being crucial later when I worked on the backend logic for our AI chat."
 
-@OnOpen
-public void onOpen(Session session) {
-sessionManager.onInboundConnection(session);
-}
+---
 
-@OnMessage
-public void onMessage(String message, Session session) {
-sessionManager.onMessageReceived(session, message);
-}
+## Slide 4: The Core Project
+**Visuals:** High-level architecture diagram or logos of the tech stack (Spring Boot, React, TypeScript).
+**Slide Text:**
+*   **The Problem:** The Support team needed streamlined access to orders, executions, and audits.
+*   **Our Solution:** A robust, full-stack internal platform.
+*   **Tech Stack:** Spring Boot (Backend), React TypeScript (Frontend).
+*   **The Team:** 5 Interns driving the architecture and execution.
 
-@OnClose
-public void onClose(Session session, CloseReason reason) {
-sessionManager.onConnectionClosed(session);
-}
+**Speaker Notes:**
+"Our main mission for the internship was building a platform for the support team. They needed an easy, unified way to access a massive database of orders, executions, and audits. We used Spring Boot for the backend and React with TypeScript for the frontend. What made this special was that us five interns were involved in the architecture and the core decisions right from the start."
 
-@OnError
-public void onError(Session session, Throwable throwable) {
-System.err.println("[Error] WebSocket Server Error: " + throwable.getMessage());
-}
+---
 
-// --- CONFIGURATOR FOR DEPENDENCY INJECTION ---
-public static class EndpointConfigurator extends ServerEndpointConfig.Configurator {
-private static ChatSessionManager globalSessionManager;
+## Slide 5: Building the UI (Frontend Focus)
+**Visuals:** *[Insert high-quality screenshots of the search panel and display filters]*
+**Slide Text:**
+*   Designing an intuitive search repository.
+*   Building the display filters.
 
-public static void setSessionManager(ChatSessionManager sm) {
-globalSessionManager = sm;
-}
+**Speaker Notes:**
+"Here is a look at some of my core frontend work. I spent a lot of time building out the display filters and the search panel you see here. The goal was to make this as intuitive as possible for the support team, so they could easily parse through massive amounts of data without feeling overwhelmed."
 
-@Override
-public <T> T getEndpointInstance(Class<T> endpointClass) {
-return (T) new ChatServerEndpoint(globalSessionManager);
-}
-}
-}
+---
 
-//========_=_=<=<=<=<=<=<=<============
-package com.yourname.p2pchat.network;
+## Slide 6: Stepping Up (The Backend Crossover)
+**Visuals:** Icons representing flexibility (e.g., arrows crossing between a frontend and backend icon).
+**Slide Text:**
+*   **The Task:** Multiple selection & numeric range filters.
+*   **The Pivot:** Taking ownership when plans change.
+*   Implemented server-side hard limits & Hikari connection pools.
 
-import com.yourname.p2pchat.core.ChatSessionManager;
-import jakarta.websocket.*;
+**Speaker Notes:**
+"In software, plans change, and you have to adapt. I was originally assigned to handle the frontend side for the numeric range and multiple selection filters. But, the intern responsible for the backend of this feature went on vacation. I wanted to keep our momentum going, so I volunteered to take over the backend for it as well. It was incredibly rewarding to connect the whole pipeline myself, and I ended up implementing the server-side hard limits and integrating the Hikari database connection pool to ensure it was highly performant."
 
-@ClientEndpoint
-public class ChatClientEndpoint {
+---
 
-private final ChatSessionManager sessionManager;
+## Slide 7: The Great Entra Challenge
+**Visuals:** The Microsoft Entra logo next to a humorous "bug" or "detective" icon.
+**Slide Text:**
+*   **The Challenge:** Microsoft Entra Login integration.
+*   **The Culprit:** The wrong access key.
+*   **The Lesson:** The power of pair programming.
 
-public ChatClientEndpoint(ChatSessionManager sessionManager) {
-this.sessionManager = sessionManager;
-}
+**Speaker Notes:**
+"Of course, not everything went perfectly smoothly. One of our biggest headaches was integrating the login with Microsoft Entra. My teammate on the frontend and I were working hand-in-hand, banging our heads against the wall trying to figure out why the authentication was failing. After quite a while of deep debugging, we finally realized... we were using the wrong access key. It was one of those classic developer face-palm moments, but working through it side-by-side with my teammate taught me a lot about resilience and pair programming."
 
-@OnOpen
-public void onOpen(Session session) {
-sessionManager.onOutboundConnectionOpened(session);
-}
+---
 
-@OnMessage
-public void onMessage(String message, Session session) {
-sessionManager.onMessageReceived(session, message);
-}
+## Slide 8: The Hackathon - The Strategy
+**Visuals:** *[Insert Hackathon photos of you and the team working/brainstorming]*
+**Slide Text:**
+*   2-3 days of intense development.
+*   **Our Strategy:** Balance basic functionality with beautiful mocks.
+*   Dividing and conquering the presentation.
 
-@OnClose
-public void onClose(Session session, CloseReason reason) {
-sessionManager.onConnectionClosed(session);
-}
+**Speaker Notes:**
+"Outside the main project, the hackathon was an absolute highlight. We only had 2 or 3 days, so we knew we couldn't build a flawless, fully-featured app. We had to be strategic. We focused on a fine balance: building out the core backend functionality, while using beautifully mocked actions on the frontend to make it look highly presentable. It was a massive lesson in MVP product management."
 
-@OnError
-public void onError(Session session, Throwable throwable) {
-System.err.println("[Error] WebSocket Client Error: " + throwable.getMessage());
-}
-}
+---
 
-//========_===============
+## Slide 9: The Hackathon - The Pitch
+**Visuals:** *[Insert photo of the hackathon pitch/demo if you have one, or a photo of the final team]*
+**Slide Text:**
+*   Pitching the business side to coworkers.
+*   Placed 3rd out of 5 teams.
+*   An exhausting, incredibly fun experience.
 
-private final Map<Session, ConnectionDirection> pendingConnections = new ConcurrentHashMap<>();
-private final Map<String, Session> activeChats = new ConcurrentHashMap<>();
-private final Map<Session, String> socketToPeerId = new ConcurrentHashMap<>();
+**Speaker Notes:**
+"When it came time to present, we divided and conquered. My teammate ran the technical demo, and I took the stage to pitch the business side. The pitch went great, and the coworkers in the room really loved our concept. We ended up placing 3rd out of 5 teams. Honestly, I was a little annoyed we didn't win because we worked so hard on it, but looking back, I am deeply satisfied. It was one of the most fun and intense experiences of the summer."
 
-//===============
+---
 
-// OLD: conn.send(json);
-// NEW:
-conn.getBasicRemote().sendText(json);
+## Slide 10: The Cluj Culture & Community
+**Visuals:** *[Insert photos from drinks, pizza outings, the summer party, coffee machine]*
+**Slide Text:**
+*   Building a genuine community.
+*   Pizza recommendations, coffee chats, and the LSEG Summer Party.
 
-////===================
-import jakarta.websocket.ContainerProvider;
-import jakarta.websocket.WebSocketContainer;
-import java.net.URI;
+**Speaker Notes:**
+"What really made these 9 weeks fly by was the culture here in Cluj. Us five interns became incredibly close. From hanging out at the coffee machine, to going out for drinks, to trying the great local pizza place that Tudor recommended to me. And remember how I was nervous about meeting the bosses? Well, hanging out with them at the LSEG summer party completely changed that. It’s an environment where it’s easy to make friends and feel supported."
 
-public void connectToPeer(String ip, int port) {
-try {
-URI uri = new URI("ws://" + ip + ":" + port + "/chat");
+---
 
-// This is how Jakarta WebSockets initiates a client connection
-WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-container.connectToServer(new ChatClientEndpoint(this), uri);
+## Slide 11: Alignment with LSEG Values
+**Visuals:** The 4 LSEG Values (Partnership, Excellence, Change, Integrity).
+**Slide Text:**
+*   **Partnership:** Seamless collaboration across the intern team.
+*   **Excellence:** Delivering reliable code on strict timelines.
+*   **Change:** Pushing into complex architecture (like threads and full-stack features).
+*   **Integrity:** Accountability and taking ownership of tasks.
 
-} catch (Exception e) {
-ui.displayError("Failed to connect: " + e.getMessage());
-}
-}
+**Speaker Notes:**
+"When I look at my self-evaluation, I feel really proud of how our work aligned with LSEG's values. **Partnership** was obvious during the hackathon and when pair-programming on the Entra login. **Excellence** was our north star—applying our rigorous training to the final project. Taking over backend tasks to keep the project moving was my way of driving **Change**. And **Integrity** meant holding myself accountable for the quality of the code I was shipping every day."
 
-// Add this callback for the ChatClientEndpoint to trigger when it succeeds
-public void onOutboundConnectionOpened(Session session) {
-pendingConnections.put(session, ConnectionDirection.OUTBOUND);
+---
 
-// We initiated, so we speak first
-Message initMsg = new Message(MessageType.INIT, myId, "Requesting connection");
-try {
-session.getBasicRemote().sendText(JsonUtil.serialize(initMsg));
-} catch (Exception e) {
-e.printStackTrace();
-}
-}
+## Slide 12: Key Learnings & The Future
+**Visuals:** A summary icon or a forward-looking arrow.
+**Slide Text:**
+*   Mastered enterprise Java and system architecture.
+*   Gained confidence in business pitching and cross-stack ownership.
+*   **Next Goal:** Securing a permanent engineering role.
 
-//////==============>=>=>>=>=>=<<=<=====
-package com.yourname.p2pchat;
+**Speaker Notes:**
+"Looking back at the goals I set on Day 1, I feel I’ve achieved them. I’ve grown from intense training into executing complex features. I learned the business logic, practiced my presentation skills during the hackathon, and built a fantastic network. This internship has entirely solidified my goal: I want to secure a permanent engineering role here and continue growing with this team."
 
-import com.yourname.p2pchat.core.ChatSessionManager;
-import com.yourname.p2pchat.core.GroupManager;
-import com.yourname.p2pchat.network.ChatServerEndpoint;
-import com.yourname.p2pchat.ui.ConsoleUI;
-import org.glassfish.tyrus.server.Server;
+---
 
-import java.util.Scanner;
+## Slide 13: Acknowledgements
+**Visuals:** A "Thank You" graphic or a big group photo.
+**Slide Text:**
+*   Tudor Fracas 
+*   My Mentors & People Leader
+*   The Cluj Engineering Team
+*   My Fellow Interns!
 
-public class Main {
-public static void main(String[] args) {
-Scanner scanner = new Scanner(System.in);
+**Speaker Notes:**
+"I want to end with some thank yous. Thank you to Tudor, for giving me that first push at the job fair years ago and for the great pizza recommendations. To my mentors and people leader for teaching us the right way to write enterprise software. To the wider team for being so welcoming. And finally, to my fellow interns—thank you for the laughs, the debugging sessions, and a great summer."
 
-System.out.print("Enter your username: ");
-String myId = scanner.nextLine().trim();
+---
 
-System.out.print("Enter port to listen on: ");
-int listenPort = Integer.parseInt(scanner.nextLine().trim());
-String myIp = "127.0.0.1";
+## Slide 14: Q&A
+**Visuals:** Simple "Questions?" text.
+**Slide Text:** 
+*   Open for questions!
 
-ConsoleUI ui = new ConsoleUI();
-ChatSessionManager sessionManager = new ChatSessionManager(myId, ui);
-GroupManager groupManager = new GroupManager(myId, myIp, listenPort, sessionManager, ui);
-
-ui.setSessionManager(sessionManager);
-ui.setGroupManager(groupManager);
-sessionManager.setGroupManager(groupManager);
-
-// Inject the SessionManager into the Server Endpoint Configurator
-ChatServerEndpoint.EndpointConfigurator.setSessionManager(sessionManager);
-
-// Start the standalone WebSocket server
-// Parameters: hostname, port, root path, endpoint class
-Server server = new Server("0.0.0.0", listenPort, "", null, ChatServerEndpoint.class);
-
-try {
-server.start();
-System.out.println("[System] WebSocket Server started on ws://0.0.0.0:" + listenPort + "/chat");
-
-// Block the main thread with the UI loop
-ui.start();
-
-} catch (Exception e) {
-System.err.println("Fatal Error: " + e.getMessage());
-} finally {
-System.out.println("Executing graceful shutdown...");
-sessionManager.shutdownAll();
-server.stop();
-System.out.println("Application terminated.");
-System.exit(0);
-}
-}
-}
+**Speaker Notes:**
+"Thank you so much for your time. I’d be happy to answer any questions you might have!"
