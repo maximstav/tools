@@ -1,213 +1,102 @@
-package com.lseg.supportportal.backend.core.search.deserializer;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.lseg.supportportal.backend.core.search.domain.DateRangeValue;
-import com.lseg.supportportal.backend.core.search.domain.NumericRangeValue;
-import com.lseg.supportportal.backend.core.search.domain.SearchCriteria;
-import com.lseg.supportportal.backend.core.search.domain.SearchOperator;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+@RestController
+@RequestMapping("/api/chat")
+@RequiredArgsConstructor
+public class ChatController {
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
+    private final ChatService chatService;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-class SearchCriteriaDeserializerTest {
-
-    private ObjectMapper objectMapper;
-
-    @BeforeEach
-    void setUp() {
-        objectMapper = new ObjectMapper();
-        // Required to deserialize LocalDate instances in the payload records
-        objectMapper.registerModule(new JavaTimeModule()); 
-    }
-
-    @Test
-    void shouldDeserializeEqualOperator() throws JsonProcessingException {
-        // Given
-        String json = """
-            {
-                "key": "name",
-                "operator": "EQUAL",
-                "value": "John Doe"
-            }
-            """;
-
-        // When
-        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
-
-        // Then
-        assertThat(result).isNotNull();
-        assertThat(result.key()).isEqualTo("name");
-        assertThat(result.operator()).isEqualTo(SearchOperator.EQUAL);
-        assertThat(result.value()).isEqualTo("John Doe");
-    }
-
-    @Test
-    void shouldDeserializeNumericBetweenOperator() throws JsonProcessingException {
-        // Given
-        String json = """
-            {
-                "key": "price",
-                "operator": "BETWEEN",
-                "value": {
-                    "from": 10.5,
-                    "to": 50.75
-                }
-            }
-            """;
-
-        // When
-        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
-
-        // Then
-        assertThat(result.key()).isEqualTo("price");
-        assertThat(result.operator()).isEqualTo(SearchOperator.BETWEEN);
-        assertThat(result.value()).isInstanceOf(NumericRangeValue.class);
-
-        NumericRangeValue numericRange = (NumericRangeValue) result.value();
-        assertThat(numericRange.fromInclusive()).isEqualTo(new BigDecimal("10.5"));
-        assertThat(numericRange.toInclusive()).isEqualTo(new BigDecimal("50.75"));
-    }
-
-    @Test
-    void shouldDeserializeDateBetweenOperator() throws JsonProcessingException {
-        // Given
-        String json = """
-            {
-                "key": "createdDate",
-                "operator": "BETWEEN",
-                "value": {
-                    "from": "2023-10-01",
-                    "to": "2023-10-15"
-                }
-            }
-            """;
-
-        // When
-        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
-
-        // Then
-        assertThat(result.key()).isEqualTo("createdDate");
-        assertThat(result.operator()).isEqualTo(SearchOperator.BETWEEN);
-        assertThat(result.value()).isInstanceOf(DateRangeValue.class);
-
-        DateRangeValue dateRange = (DateRangeValue) result.value();
-        assertThat(dateRange.fromInclusive()).isEqualTo(LocalDateTime.of(2023, 10, 1, 0, 0));
-        // Verify that 'to' date was shifted to the next day's start time as per deserializer logic
-        assertThat(dateRange.toExclusive()).isEqualTo(LocalDateTime.of(2023, 10, 16, 0, 0)); 
-    }
-
-    @Test
-    void shouldThrowWhenBetweenOperatorMissesFromOrTo() {
-        // Given
-        String jsonMissesTo = """
-            {
-                "key": "price",
-                "operator": "BETWEEN",
-                "value": {
-                    "from": 10.5
-                }
-            }
-            """;
-
-        // When & Then
-        assertThatThrownBy(() -> objectMapper.readValue(jsonMissesTo, SearchCriteria.class))
-                .isInstanceOf(JsonMappingException.class)
-                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
-                .hasMessageContaining("BETWEEN operator requires both 'from' and 'to' values");
-    }
-    
-    @Test
-    void shouldThrowWhenDateBetweenOperatorHasNullDates() {
-        // Given
-        String jsonNullDates = """
-            {
-                "key": "date",
-                "operator": "BETWEEN",
-                "value": {
-                    "from": null,
-                    "to": null
-                }
-            }
-            """;
-
-        // When & Then
-        assertThatThrownBy(() -> objectMapper.readValue(jsonNullDates, SearchCriteria.class))
-                .isInstanceOf(JsonMappingException.class)
-                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
-                .hasMessageContaining("BETWEEN operator requires both 'from' and 'to' values");
-    }
-
-    @Test
-    void shouldDeserializeInOperator() throws JsonProcessingException {
-        // Given
-        String json = """
-            {
-                "key": "status",
-                "operator": "IN",
-                "value": {
-                    "values": ["ACTIVE", "PENDING", "RESOLVED"]
-                }
-            }
-            """;
-
-        // When
-        SearchCriteria result = objectMapper.readValue(json, SearchCriteria.class);
-
-        // Then
-        assertThat(result.key()).isEqualTo("status");
-        assertThat(result.operator()).isEqualTo(SearchOperator.IN);
+    @PostMapping
+    public ChatResponse chat(@RequestBody ChatRequest request, @AuthenticationPrincipal Jwt jwt) {
+        // Extract a stable, immutable identifier from the token claims.
+        // Replace "email" with "user_id", "oid", or whatever your immutable claim is.
+        String stableUserId = jwt.getClaimAsString("email"); 
         
-        @SuppressWarnings("unchecked")
-        List<String> values = (List<String>) result.value();
-        assertThat(values).containsExactly("ACTIVE", "PENDING", "RESOLVED");
+        if (stableUserId == null || stableUserId.isBlank()) {
+            throw new UnauthorizedException("User identifier is missing from token");
+        }
+
+        return chatService.handle(request, stableUserId);
+    }
+}
+
+package com.lseg.supportportal.backend.tools.aichat.service;
+
+import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
+import java.util.UUID;
+// ... other imports
+
+@Service
+@RequiredArgsConstructor
+public class ChatService {
+
+    private static final String CONVERSATION_ID_SEPARATOR = "::";
+    private static final int MAX_CONVERSATION_ID_LENGTH = 100;
+
+    private final ChatClient aiChatClient;
+    private final ChatContext chatContext;
+
+    public ChatResponse handle(final ChatRequest request, final String stableUserId) {
+        if (stableUserId == null || stableUserId.isBlank()) {
+            throw new IllegalArgumentException("stableUserId cannot be null or blank");
+        }
+
+        final String conversationId = resolveConversationId(stableUserId, request.conversationId());
+
+        final String answer = aiChatClient.prompt()
+                .user(request.message())
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .call()
+                .content();
+
+        return new ChatResponse(answer, chatContext.getReasoningSteps(), chatContext.getResults().orElse(null));
     }
 
-    @Test
-    void shouldThrowWhenInOperatorMissesValuesArray() {
-        // Given
-        String jsonMissingValues = """
-            {
-                "key": "status",
-                "operator": "IN",
-                "value": {
-                    "wrongKey": ["ACTIVE"]
-                }
-            }
-            """;
-
-        // When & Then
-        assertThatThrownBy(() -> objectMapper.readValue(jsonMissingValues, SearchCriteria.class))
-                .isInstanceOf(JsonMappingException.class)
-                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
-                .hasMessageContaining("IN operator requires a 'values' array");
+    private static String resolveConversationId(final String stableUserId, final String feConversationId) {
+        final String localId = (feConversationId == null || feConversationId.isBlank()) 
+                ? UUID.randomUUID().toString() 
+                : sanitize(feConversationId);
+                
+        return stableUserId + CONVERSATION_ID_SEPARATOR + localId;
     }
 
-    @Test
-    void shouldThrowWhenInOperatorValuesArrayIsEmpty() {
-        // Given
-        String jsonEmptyValues = """
-            {
-                "key": "status",
-                "operator": "IN",
-                "value": {
-                    "values": []
-                }
-            }
-            """;
+    private static String sanitize(final String conversationId) {
+        final String stripped = conversationId.strip().replace(CONVERSATION_ID_SEPARATOR, "_");
+        return stripped.length() > MAX_CONVERSATION_ID_LENGTH 
+                ? stripped.substring(0, MAX_CONVERSATION_ID_LENGTH) 
+                : stripped;
+    }
+}
 
-        // When & Then
-        assertThatThrownBy(() -> objectMapper.readValue(jsonEmptyValues, SearchCriteria.class))
-                .isInstanceOf(JsonMappingException.class)
-                .hasRootCauseInstanceOf(InvalidSearchCriteriaException.class)
-                .hasMessageContaining("IN operator requires at least one selected value");
+
+
+=====
+
+    import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/chat")
+@RequiredArgsConstructor
+public class ChatController {
+
+    private final ChatService chatService;
+
+    @PostMapping
+    public ChatResponse chat(@RequestBody ChatRequest request, @AuthenticationPrincipal Jwt jwt) {
+        // Extract the immutable Object ID from Entra
+        String entraObjectId = jwt.getClaimAsString("oid"); 
+        
+        if (entraObjectId == null || entraObjectId.isBlank()) {
+            throw new UnauthorizedException("Object ID (oid) is missing from token");
+        }
+
+        // Passes e.g., "a1b2c3d4-5678-90ab-cdef-111122223333" to your service
+        return chatService.handle(request, entraObjectId); 
     }
 }
