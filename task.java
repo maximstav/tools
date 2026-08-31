@@ -100,3 +100,17 @@ public class ChatController {
         return chatService.handle(request, entraObjectId); 
     }
 }
+
+
+
+    private static String normalizeClientConversationId(final String clientConversationId) {
+        // 1. Remove spaces and prevent delimiter injection
+        String normalized = clientConversationId.strip().replace(CONVERSATION_ID_SEPARATOR, "_");
+        
+        // 2. Enforce maximum length
+        if (normalized.length() > MAX_CONVERSATION_ID_LENGTH) {
+            return normalized.substring(0, MAX_CONVERSATION_ID_LENGTH);
+        }
+        
+        return normalized;
+    }
