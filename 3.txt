@@ -59,3 +59,16 @@ class ExampleControllerIT {
     record ExampleResponse(Long id, String status, Metadata metadata) {}
     record Metadata(String type) {}
 }
+
+
+Implement an 'Export All' to CSV feature for our search portal. The goal is to export all database rows matching the user's dynamic filters without loading the entire dataset into memory (to prevent OOM errors on large datasets).
+
+Please do the following:
+
+1. **Dependencies:** Add `org.apache.commons:commons-csv` to `build.gradle`.
+2. **Service Layer:** In `AbstractSearchService.java`, add a new generic method (e.g., `exportAll`). Use the existing `SpecificationBuilder` to apply the filters. Use Spring Data JPA's `.stream()` (via `JpaSpecificationExecutor`) to iterate through the results.
+3. **Memory Management:** Inside the stream loop, extract the fields, write them to the CSV, and crucially, use `EntityManager.detach(entity)` to clear the Hibernate L1 cache after each row.
+4. **Dynamic Columns:** Use the existing `DatasetService` and `ColumnInfo` classes to dynamically resolve the CSV headers and map the entity fields (consider using `BeanWrapper` for dynamic field extraction).
+5. **Controller Layer:** Add a `POST /export` endpoint in the respective dataset controllers (e.g., `OrderController`). It should accept the `SearchRequest` payload (ignoring pagination) and return a `StreamingResponseBody` that streams the CSV directly to the HTTP response with the correct `Content-Disposition` attachment headers.
+
+Add a maximum exort limit of 10000 rows
